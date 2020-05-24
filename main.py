@@ -34,7 +34,7 @@ def load_covidtracking_historical_data():
     return historical_df
 
 
-def transform_covidtracking_data(df):
+def transform_covidtracking_data_old(df):
     total_case_column_name_formatter = "total_cases_t_minus_{}"
     new_case_column_name_formatter = "new_cases_t_minus_{}"
 
@@ -53,11 +53,15 @@ def transform_covidtracking_data(df):
             [column_formatter.format(lag) for lag in range(number_of_lags)]
         )
 
+    # df.index = pd.MultiIndex(df[STATE_SOURCE_FIELD], df[DATE_SOURCE_FIELD])
+    # df.set_index(keys=[STATE_SOURCE_FIELD, DATE_SOURCE_FIELD], inplace=True)
+
     transformed_df = pd.DataFrame(index=states, columns=column_names)
 
     for state in states:
         # Start each state looking up today.
-        date_to_lookup = datetime.datetime.now()
+        # TODO(lbrown): remove 1 day subtraction
+        date_to_lookup = datetime.datetime.now() - datetime.timedelta(days=1)
 
         for lag in range(number_of_lags):
             print(f"Processing {state} for lag {lag}.")
@@ -79,21 +83,6 @@ def transform_covidtracking_data(df):
             date_to_lookup = date_to_lookup - datetime.timedelta(days=1)
 
     for state in states:
-        for lag in range(number_of_lags - 1):
-            # Calculate new cases.
-            previous_value = transformed_df.loc[
-                state, total_case_column_name_formatter.format(lag + 1)
-            ]
-            previous_value = previous_value if previous_value else 0
-
-            value = transformed_df.loc[
-                state, total_case_column_name_formatter.format(lag)
-            ]
-
-            transformed_df.loc[state, new_case_column_name_formatter.format(lag)] = (
-                value - previous_value
-            )
-
         for lag in range(number_of_lags - 1):
             # Calculate new cases.
             previous_value = transformed_df.loc[
@@ -152,7 +141,7 @@ def get_sheets_client():
 
 if __name__ == "__main__":
     df = load_covidtracking_historical_data()
-    df = transform_covidtracking_data(df=df)
+    df = transform_covidtracking_data_old(df=df)
 
     client, credentials = get_sheets_client()
 
