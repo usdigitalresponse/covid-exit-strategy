@@ -5,12 +5,10 @@ import numpy as np
 import pandas as pd
 from pandas.testing import assert_series_equal
 
-from main import (
-    get_consecutive_positive_or_negative_values,
-    fit_and_predict_cubic_spline_in_r,
-    get_max_run_in_window,
-)
 from main import fit_and_predict_cubic_spline
+from main import fit_and_predict_cubic_spline_in_r
+from main import get_consecutive_positive_or_negative_values
+from main import get_max_run_in_window
 
 
 class MainTest(unittest.TestCase):
