@@ -1,8 +1,10 @@
 import datetime
 
 import gspread
+import numpy as np
 import pandas as pd
 import requests
+import rpy2.robjects as robjects
 import scipy.interpolate as interpolate
 from df2gspread import df2gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -61,7 +63,7 @@ STATE_SUMMARY_COLUMNS = [
 CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY = "1s534JoVjsetLDUxzkww3yQSnRj9H-8QLMKPUrq7RAuc"
 FOR_WEBSITE_TAB_NAME = "For Website"
 ALL_STATE_DATA_TAB_NAME = "All State Data"
-WORK_IN_PROGRESS_CA_ONLY_TAB_NAME = "Work in Progress (California Only)"
+WORK_IN_PROGRESS_CA_ONLY_TAB_NAME = "Work in Progress (NY Only)"
 STATE_SUMMARY_TAB_NAME = "State Summary"
 
 
@@ -173,13 +175,44 @@ def fit_and_predict_cubic_spline(series_):
 
     # Note: you can't simply uses pd.Series.interpolate because that will only fill in data for the `nan` values.
     predicted_spline_values = interpolate.UnivariateSpline(
-        x=substitute_index,
-        y=series_.values,
-        k=3,
-        # For reference, the CDC uses this method with an `spar` of .5, as seen in line 384 of `Trajectory Analysis.R`:
-        # https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/smooth.spline
-        s=0.5,
+        x=substitute_index, y=series_.values, k=3
     )(substitute_index)
+
+    predicted_spline_series = pd.Series(
+        data=predicted_spline_values, index=series_.index
+    )
+
+    return predicted_spline_series
+
+
+def fit_and_predict_cubic_spline_in_r(
+    series_, smoothing_parameter=None, replace_nan=True
+):
+    if not smoothing_parameter:
+        # Import `NULL` from R.
+        smoothing_parameter = robjects.r["as.null"]()
+
+    # Assert that the index is sorted.
+    if not series_.index.is_monotonic_increasing:
+        raise ValueError("Index is not sorted.")
+
+    # Replace nans
+    if replace_nan:
+        series_ = series_.fillna(value=0)
+
+    r_x = robjects.DateVector(series_.index)
+    r_y = robjects.FloatVector(series_.values.astype(float))
+
+    # Extract R's smoothing function.
+    r_smooth_spline = robjects.r["smooth.spline"]
+
+    # For reference, the CDC uses this method with an `spar` of .5, as seen in line 384 of `Trajectory Analysis.R`:
+    # https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/smooth.spline
+    fitted_spline = r_smooth_spline(x=r_x, y=r_y, spar=smoothing_parameter)
+
+    predicted_spline_values = list(
+        robjects.r["predict"](fitted_spline, robjects.FloatVector(r_x)).rx2("y")
+    )
 
     predicted_spline_series = pd.Series(
         data=predicted_spline_values, index=series_.index
@@ -223,8 +256,9 @@ def transform_covidtracking_data(df):
         # Calculate the cubic spline on the 3 day average of total cases.
         df.loc[
             (state,), TOTAL_CASES_3_DAY_AVERAGE_CUBIC_SPLINE_FIELD
-        ] = fit_and_predict_cubic_spline(
-            df.loc[(state,), TOTAL_CASES_3_DAY_AVERAGE_FIELD]
+        ] = fit_and_predict_cubic_spline_in_r(
+            series_=df.loc[(state,), TOTAL_CASES_3_DAY_AVERAGE_FIELD],
+            smoothing_parameter=0.5,
         ).values
 
         # Calculate 3-day rolling average of new cases.
@@ -238,8 +272,9 @@ def transform_covidtracking_data(df):
         )
 
         # Calculate the cubic spline on the 3 day average of total cases.
-        df.loc[(state,), NEW_CASES_3DCS_FIELD] = fit_and_predict_cubic_spline(
-            df.loc[(state,), NEW_CASES_3_DAY_AVERAGE_FIELD]
+        df.loc[(state,), NEW_CASES_3DCS_FIELD] = fit_and_predict_cubic_spline_in_r(
+            series_=df.loc[(state,), NEW_CASES_3_DAY_AVERAGE_FIELD],
+            smoothing_parameter=0.5,
         ).values
 
         # Calculate 3DCS new cases diff.
@@ -250,25 +285,25 @@ def transform_covidtracking_data(df):
         # Calculate consecutive increases or decreases.
         df.loc[
             (state,), CONSECUTIVE_INCREASE_NEW_CASES_3DCS_FIELD
-        ] = find_consecutive_positive_or_negative_values(
+        ] = get_consecutive_positive_or_negative_values(
             series_=df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD], positive_values=True
         ).values
 
         df.loc[
             (state,), CONSECUTIVE_DECREASE_NEW_CASES_3DCS_FIELD
-        ] = find_consecutive_positive_or_negative_values(
+        ] = get_consecutive_positive_or_negative_values(
             series_=df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD], positive_values=False
         ).values
 
         # Calculate criteria 1A: must see at least 9 days of a decrease in new cases over a 14 day window.
         df.loc[
             (state,), MAX_RUN_OF_DECREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
-        ] = (
-            df.loc[(state,), CONSECUTIVE_DECREASE_NEW_CASES_3DCS_FIELD]
-            .rolling(window=14, min_periods=1, center=False)
-            .max()
-            .values
-        )
+        ] = get_max_run_in_window(
+            series_=df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
+            positive_values=False,
+            window_size=14,
+        ).values
+
         df.loc[(state,), CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD] = (
             df.loc[
                 (state,), MAX_RUN_OF_DECREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
@@ -279,17 +314,17 @@ def transform_covidtracking_data(df):
         # Calculate criteria 1B: must not see 5 or more days of an increase in new cases over a 14 day window.
         df.loc[
             (state,), MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
-        ] = (
-            df.loc[(state,), CONSECUTIVE_INCREASE_NEW_CASES_3DCS_FIELD]
-            .rolling(window=14, min_periods=1, center=False)
-            .max()
-            .values
-        )
+        ] = get_max_run_in_window(
+            series_=df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
+            positive_values=True,
+            window_size=14,
+        ).values
+
         df.loc[(state,), CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD] = (
             df.loc[
                 (state,), MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
             ]
-            <= 5
+            < 5
         ).values
 
         # Calculate criteria 1C: new cases on T-0 must be < T-14.
@@ -313,7 +348,7 @@ def transform_covidtracking_data(df):
     return df
 
 
-def find_consecutive_positive_or_negative_values(series_, positive_values=True):
+def get_consecutive_positive_or_negative_values(series_, positive_values=True):
     meets_criteria = series_ >= 0 if positive_values else series_ < 0
     consecutive_positive_values = meets_criteria * (
         meets_criteria.groupby(
@@ -322,6 +357,31 @@ def find_consecutive_positive_or_negative_values(series_, positive_values=True):
         + 1
     )
     return consecutive_positive_values
+
+
+def get_max_run_in_window(series_, positive_values, window_size=14):
+    # Assert that the index is sorted.
+    if not series_.index.is_monotonic_increasing:
+        raise ValueError("Index is not sorted.")
+
+    returned_series = pd.Series(index=series_.index, data=np.nan)
+
+    for i in range(window_size - 1, len(series_)):
+        # Start calculating the run of values that happened *within (and only within)* this window.
+        # TODO(lbrown): this is incredibly inefficient, but I can't think of a faster way while following the right
+        #  interpretation of the rules.
+        consecutive_positive_or_negative_values = get_consecutive_positive_or_negative_values(
+            series_=series_.iloc[i + 1 - window_size : i + 1],
+            positive_values=positive_values,
+        )
+
+        # Find the max run.
+        returned_series[i] = consecutive_positive_or_negative_values.max()
+
+        if i == len(series_) - 1:
+            pass
+
+    return returned_series
 
 
 def post_covidtracking_data(df, workbook_key, tab_name, credentials):
@@ -374,7 +434,7 @@ if __name__ == "__main__":
 
     # Upload data for just CA.
     post_covidtracking_data(
-        df=transformed_df.loc[transformed_df[STATE_SOURCE_FIELD] == "CA",],
+        df=transformed_df.loc[transformed_df[STATE_SOURCE_FIELD] == "NY",],
         workbook_key=CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY,
         tab_name=WORK_IN_PROGRESS_CA_ONLY_TAB_NAME,
         credentials=credentials,
