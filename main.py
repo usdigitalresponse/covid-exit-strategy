@@ -1,4 +1,5 @@
 import datetime
+import json
 
 import gspread
 import numpy as np
@@ -33,6 +34,15 @@ MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD = (
 MAX_RUN_OF_DECREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD = (
     "max_run_of_decreasing_new_cases_in_14_day_window_3dcs"
 )
+
+TOTAL_NEW_CASES_IN_14_DAY_WINDOW_FIELD = "total_new_cases_in_14_day_window"
+TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_FIELD = (
+    "total_new_cases_in_14_day_window_per_100k_population"
+)
+TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_LOWER_THAN_THRESHOLD_FIELD = (
+    "total_new_cases_in_14_day_window_per_100k_population_lower_than_threshold"
+)
+TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_PREVIOUSLY_ELEVATED_FIELD = "total_new_cases_in_14_day_window_per_100k_population_previously_higher_than_threshold"
 CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD = (
     "cdc_criteria_1a_covid_continuous_decline"
 )
@@ -41,6 +51,7 @@ NEW_CASES_TODAY_MINUS_NEW_CASES_14_DAYS_AGO_3DCS_FIELD = (
     "new_cases_compared_to_14_days_ago_3DCS"
 )
 CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD = "cdc_criteria_1c_covid_overall_decline"
+CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE = "cdc_criteria_1d_covid_near_zero_incidence"
 CDC_CRITERIA_COMBINED_FIELD = "cdc_criteria_1_combined"
 
 # Define the list of columns that should appear in the state summary tab.
@@ -56,6 +67,7 @@ STATE_SUMMARY_COLUMNS = [
     CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
     NEW_CASES_TODAY_MINUS_NEW_CASES_14_DAYS_AGO_3DCS_FIELD,
     CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
+    CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
     CDC_CRITERIA_COMBINED_FIELD,
 ]
 
@@ -221,6 +233,19 @@ def fit_and_predict_cubic_spline_in_r(
     return predicted_spline_series
 
 
+def load_state_population_data():
+    df = pd.read_csv("./data/population.csv")
+
+    with open("./data/us_state_abbreviations.json") as state_abbreviations_file:
+        abbreviations = json.load(state_abbreviations_file)
+
+    df = df.replace({STATE_SOURCE_FIELD: abbreviations})
+
+    df = df.set_index(keys=[STATE_SOURCE_FIELD])
+
+    return df
+
+
 def transform_covidtracking_data(df):
     states = df[STATE_SOURCE_FIELD].unique()
 
@@ -232,6 +257,9 @@ def transform_covidtracking_data(df):
 
     # Sort by the index: state ascending, date ascending.
     df = df.sort_index()
+
+    # Load state population data.
+    state_population_data = load_state_population_data()
 
     for state in states:
         print(f"Processing state {state}...")
@@ -335,11 +363,67 @@ def transform_covidtracking_data(df):
             df.loc[(state,), NEW_CASES_TODAY_MINUS_NEW_CASES_14_DAYS_AGO_3DCS_FIELD] < 0
         ).values
 
+        # Calculate criteria 1D: total cases from the last 14 days must be less than 10 per 100k population.
+        df.loc[(state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_FIELD] = (
+            df.loc[(state,), NEW_CASES_FIELD]
+            .fillna(value=0)
+            .rolling(window=14, min_periods=1, center=False)
+            .sum()
+            .values
+        )
+
+        state_population = float(state_population_data.loc[state][0])
+        df.loc[
+            (state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_FIELD
+        ] = (
+            (100000.0 * df.loc[(state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_FIELD])
+            / state_population
+        ).values
+
+        df.loc[
+            (state,),
+            TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_LOWER_THAN_THRESHOLD_FIELD,
+        ] = (
+            df.loc[
+                (state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_FIELD
+            ]
+            <= 10
+        ).values
+
+        df.loc[
+            (state,),
+            TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_PREVIOUSLY_ELEVATED_FIELD,
+        ] = (
+            (
+                df.loc[
+                    (state,),
+                    TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_LOWER_THAN_THRESHOLD_FIELD,
+                ]
+                == 0
+            ).cumsum()
+            > 0
+        ).values
+
+        # To be true on 1D, the state must be (1) lower than the threshold, AND (2) previously above the threshold.
+        df.loc[(state,), CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE] = (
+            df.loc[
+                (state,),
+                TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_PREVIOUSLY_ELEVATED_FIELD,
+            ]
+            & df.loc[
+                (state,),
+                TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_LOWER_THAN_THRESHOLD_FIELD,
+            ]
+        ).values
+
         # Calculate all of the criteria combined in category 1.
         df.loc[(state,), CDC_CRITERIA_COMBINED_FIELD] = (
-            df.loc[(state,), CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD]
-            & df.loc[(state,), CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD]
-            & df.loc[(state,), CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD]
+            (
+                df.loc[(state,), CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD]
+                & df.loc[(state,), CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD]
+                & df.loc[(state,), CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD]
+            )
+            | df.loc[(state,), CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE]
         ).values
 
     # Remove the multi-index, converting date and state back to just columns.
@@ -377,9 +461,6 @@ def get_max_run_in_window(series_, positive_values, window_size=14):
 
         # Find the max run.
         returned_series[i] = consecutive_positive_or_negative_values.max()
-
-        if i == len(series_) - 1:
-            pass
 
     return returned_series
 
