@@ -15,10 +15,12 @@ from oauth2client.service_account import ServiceAccountCredentials
 DATE_SOURCE_FIELD = "date"
 STATE_SOURCE_FIELD = "state"
 TOTAL_CASES_SOURCE_FIELD = "positive"
+NEW_CASES_NEGATIVE_SOURCE_FIELD = "negativeIncrease"
+NEW_CASES_POSITIVE_SOURCE_FIELD = "positiveIncrease"
 LAST_UPDATED_SOURCE_FIELD = "dateModified"
 
 # Define output field names.
-LAST_UPDATED_FIELD = "last_updated"
+# Criteria Category 1 Fields.
 TOTAL_CASES_3_DAY_AVERAGE_FIELD = "total_cases_3_day_average"
 TOTAL_CASES_3_DAY_AVERAGE_CUBIC_SPLINE_FIELD = "total_cases_3_day_average_cubic_spline"
 NEW_CASES_3_DAY_AVERAGE_FIELD = "new_cases_3_day_average"
@@ -34,7 +36,6 @@ MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD = (
 MAX_RUN_OF_DECREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD = (
     "max_run_of_decreasing_new_cases_in_14_day_window_3dcs"
 )
-
 TOTAL_NEW_CASES_IN_14_DAY_WINDOW_FIELD = "total_new_cases_in_14_day_window"
 TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_FIELD = (
     "total_new_cases_in_14_day_window_per_100k_population"
@@ -52,7 +53,44 @@ NEW_CASES_TODAY_MINUS_NEW_CASES_14_DAYS_AGO_3DCS_FIELD = (
 )
 CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD = "cdc_criteria_1c_covid_overall_decline"
 CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE = "cdc_criteria_1d_covid_near_zero_incidence"
-CDC_CRITERIA_COMBINED_FIELD = "cdc_criteria_1_combined"
+CDC_CRITERIA_1_COMBINED_FIELD = "cdc_criteria_1_combined"
+
+
+# Criteria Category 2 Fields.
+NEW_TESTS_TOTAL_FIELD = "new_tests_total"
+NEW_TESTS_TOTAL_DIFF_FIELD = "new_tests_total_compared_to_yesterday"
+PERCENT_POSITIVE_NEW_TESTS_FIELD = "percent_positive_new_tests"
+PERCENT_POSITIVE_NEW_TESTS_DIFF_FIELD = (
+    "percent_positive_new_tests_compared_to_yesterday"
+)
+MAX_RUN_OF_INCREASING_PERCENT_POSITIVE_TESTS_FIELD = (
+    "max_run_of_increasing_percent_positive_tests"
+)
+MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_FIELD = (
+    "max_run_of_decreasing_percent_positive_tests"
+)
+MAX_RUN_OF_INCREASING_TOTAL_TESTS_FIELD = "max_run_of_increasing_total_tests"
+
+CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD = (
+    "cdc_criteria_2a_covid_percent_continuous_decline"
+)
+
+CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD = (
+    "cdc_criteria_2b_covid_total_test_volume_increasing"
+)
+
+CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD = (
+    "cdc_criteria_2c_covid_percent_overall_decline"
+)
+
+CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD = (
+    "cdc_criteria_2c_covid_near_zero_positive_tests"
+)
+CDC_CRITERIA_2_COMBINED_FIELD = "cdc_criteria_2_combined"
+
+# Other fields
+CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
+LAST_UPDATED_FIELD = "last_updated"
 
 # Define the list of columns that should appear in the state summary tab.
 STATE_SUMMARY_COLUMNS = [
@@ -68,14 +106,14 @@ STATE_SUMMARY_COLUMNS = [
     NEW_CASES_TODAY_MINUS_NEW_CASES_14_DAYS_AGO_3DCS_FIELD,
     CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
-    CDC_CRITERIA_COMBINED_FIELD,
+    CDC_CRITERIA_1_COMBINED_FIELD,
 ]
 
 # Define the names of the tabs to upload to.
 CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY = "1s534JoVjsetLDUxzkww3yQSnRj9H-8QLMKPUrq7RAuc"
 FOR_WEBSITE_TAB_NAME = "For Website"
 ALL_STATE_DATA_TAB_NAME = "All State Data"
-WORK_IN_PROGRESS_CA_ONLY_TAB_NAME = "Work in Progress (NY Only)"
+WORK_IN_PROGRESS_NY_ONLY_TAB_NAME = "Work in Progress (NY Only)"
 STATE_SUMMARY_TAB_NAME = "State Summary"
 
 
@@ -263,6 +301,8 @@ def transform_covidtracking_data(df):
 
     for state in states:
         print(f"Processing state {state}...")
+
+        ###### Calculate criteria category 1. ######
         # Calculate new cases (raw).
         df.loc[(state,), NEW_CASES_FIELD] = (
             df.loc[(state,), TOTAL_CASES_SOURCE_FIELD].diff(periods=1).values
@@ -417,7 +457,7 @@ def transform_covidtracking_data(df):
         ).values
 
         # Calculate all of the criteria combined in category 1.
-        df.loc[(state,), CDC_CRITERIA_COMBINED_FIELD] = (
+        df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD] = (
             (
                 df.loc[(state,), CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD]
                 & df.loc[(state,), CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD]
@@ -425,6 +465,87 @@ def transform_covidtracking_data(df):
             )
             | df.loc[(state,), CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE]
         ).values
+
+        ###### Calculate criteria category 2. ######
+        # For the criteria, we must add positive to negative tests to get the total (discarding inconclusive).
+        df.loc[(state,), NEW_TESTS_TOTAL_FIELD] = (
+            df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD]
+            + df.loc[(state,), NEW_CASES_NEGATIVE_SOURCE_FIELD]
+        ).values
+
+        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD] = (
+            df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD].astype(float)
+            / df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
+        ).values
+
+        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_FIELD] = (
+            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD].diff(periods=1)
+        ).values
+
+        # Calculate 2A: Achieve 14 or more consecutive days of decline in percent positive ... with up to 2-3
+        # consecutive days of increasing or stable percent positive allowed as a grace period if data are inconsistent.
+        df.loc[
+            (state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_FIELD
+        ] = get_max_run_in_window(
+            series_=df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_FIELD],
+            window_size=14,
+            positive_values=False,
+        ).values
+
+        df.loc[
+            (state,), MAX_RUN_OF_INCREASING_PERCENT_POSITIVE_TESTS_FIELD
+        ] = get_max_run_in_window(
+            series_=df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_FIELD],
+            window_size=14,
+            positive_values=True,
+        ).values
+
+        df.loc[(state,), CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD] = (
+            df.loc[(state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_FIELD] >= 11
+        ).values
+
+        # Calculate 2B: Total test volume is stable or increasing.
+        df.loc[(state,), NEW_TESTS_TOTAL_DIFF_FIELD] = (
+            df.loc[(state,), NEW_TESTS_TOTAL_FIELD].diff(periods=1).values
+        )
+
+        df.loc[
+            (state,), MAX_RUN_OF_INCREASING_TOTAL_TESTS_FIELD
+        ] = get_max_run_in_window(
+            series_=df.loc[(state,), NEW_TESTS_TOTAL_DIFF_FIELD],
+            window_size=14,
+            positive_values=False,
+        ).values
+
+        df.loc[(state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD] = (
+            df.loc[
+                (state,),
+                # TODO: is this the correct specification?
+                MAX_RUN_OF_INCREASING_TOTAL_TESTS_FIELD,
+            ]
+            >= 11
+        ).values
+
+        # Calculate 2C: 14th day [of positive percentage of tests] must be lower than 1st day.
+        df.loc[(state,), CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD] = (
+            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD].diff(periods=14) < 0
+        ).values
+
+        # Calculate all of the criteria combined in category 2.
+        df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD] = (
+            df.loc[(state,), CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD]
+            & df.loc[(state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD]
+            & df.loc[(state,), CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD]
+        ).values
+
+        # Calculate all of the criteria combined.
+        df.loc[(state,), CDC_CRITERIA_ALL_COMBINED_FIELD] = (
+            df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD]
+            & df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
+        ).values
+
+    # Add an update time.
+    df[LAST_UPDATED_FIELD] = datetime.datetime.now()
 
     # Remove the multi-index, converting date and state back to just columns.
     df = df.reset_index(drop=False)
@@ -517,7 +638,7 @@ if __name__ == "__main__":
     post_covidtracking_data(
         df=transformed_df.loc[transformed_df[STATE_SOURCE_FIELD] == "NY",],
         workbook_key=CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY,
-        tab_name=WORK_IN_PROGRESS_CA_ONLY_TAB_NAME,
+        tab_name=WORK_IN_PROGRESS_NY_ONLY_TAB_NAME,
         credentials=credentials,
     )
 
