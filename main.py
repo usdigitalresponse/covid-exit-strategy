@@ -58,18 +58,23 @@ CDC_CRITERIA_1_COMBINED_FIELD = "cdc_criteria_1_combined"
 
 # Criteria Category 2 Fields.
 NEW_TESTS_TOTAL_FIELD = "new_tests_total"
-NEW_TESTS_TOTAL_DIFF_FIELD = "new_tests_total_compared_to_yesterday"
+NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD = "new_tests_total_3_day_average"
+NEW_TESTS_TOTAL_3DCS_FIELD = "new_tests_total_3dcs"
+POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD = "positive_tests_3_day_average"
+POSITIVE_TESTS_TOTAL_3DCS_FIELD = "positive_tests_3dcs"
+NEW_TESTS_TOTAL_DIFF_3DCS_FIELD = "new_tests_total_compared_to_yesterday_3dcs"
 PERCENT_POSITIVE_NEW_TESTS_FIELD = "percent_positive_new_tests"
-PERCENT_POSITIVE_NEW_TESTS_DIFF_FIELD = (
-    "percent_positive_new_tests_compared_to_yesterday"
+PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD = "percent_positive_new_tests_3dcs"
+PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD = (
+    "percent_positive_new_tests_compared_to_yesterday_3dcs"
 )
-MAX_RUN_OF_INCREASING_PERCENT_POSITIVE_TESTS_FIELD = (
-    "max_run_of_increasing_percent_positive_tests"
+MAX_RUN_OF_INCREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD = (
+    "max_run_of_increasing_percent_positive_tests_3dcs"
 )
-MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_FIELD = (
-    "max_run_of_decreasing_percent_positive_tests"
+MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD = (
+    "max_run_of_decreasing_percent_positive_tests_3dcs"
 )
-MAX_RUN_OF_INCREASING_TOTAL_TESTS_FIELD = "max_run_of_increasing_total_tests"
+MAX_RUN_OF_INCREASING_TOTAL_TESTS_3DCS_FIELD = "max_run_of_increasing_total_tests_3dcs"
 
 CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD = (
     "cdc_criteria_2a_covid_percent_continuous_decline"
@@ -84,7 +89,7 @@ CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD = (
 )
 
 CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD = (
-    "cdc_criteria_2c_covid_near_zero_positive_tests"
+    "cdc_criteria_2d_covid_near_zero_positive_tests"
 )
 CDC_CRITERIA_2_COMBINED_FIELD = "cdc_criteria_2_combined"
 
@@ -107,6 +112,12 @@ STATE_SUMMARY_COLUMNS = [
     CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
     CDC_CRITERIA_1_COMBINED_FIELD,
+    CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD,
+    CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD,
+    CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
+    CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
+    CDC_CRITERIA_2_COMBINED_FIELD,
+    CDC_CRITERIA_ALL_COMBINED_FIELD,
 ]
 
 # Define the names of the tabs to upload to.
@@ -473,46 +484,80 @@ def transform_covidtracking_data(df):
             + df.loc[(state,), NEW_CASES_NEGATIVE_SOURCE_FIELD]
         ).values
 
+        df.loc[(state,), NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD] = (
+            df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
+            .rolling(window=3, min_periods=1, center=False)
+            .mean()
+            .values
+        )
+
+        df.loc[
+            (state,), NEW_TESTS_TOTAL_3DCS_FIELD
+        ] = fit_and_predict_cubic_spline_in_r(
+            series_=df.loc[(state,), NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD],
+            smoothing_parameter=0.5,
+        ).values
+
+        df.loc[(state,), POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD] = (
+            df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD]
+            .rolling(window=3, min_periods=1, center=False)
+            .mean()
+            .values
+        )
+
+        df.loc[
+            (state,), POSITIVE_TESTS_TOTAL_3DCS_FIELD
+        ] = fit_and_predict_cubic_spline_in_r(
+            series_=df.loc[(state,), POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD],
+            smoothing_parameter=0.5,
+        ).values
+
         df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD] = (
             df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD].astype(float)
             / df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
         ).values
 
-        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_FIELD] = (
-            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD].diff(periods=1)
+        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
+            df.loc[(state,), POSITIVE_TESTS_TOTAL_3DCS_FIELD].astype(float)
+            / df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD]
+        ).values
+
+        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD] = (
+            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD].diff(periods=1)
         ).values
 
         # Calculate 2A: Achieve 14 or more consecutive days of decline in percent positive ... with up to 2-3
         # consecutive days of increasing or stable percent positive allowed as a grace period if data are inconsistent.
         df.loc[
-            (state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_FIELD
+            (state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD
         ] = get_max_run_in_window(
-            series_=df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_FIELD],
+            series_=df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD],
             window_size=14,
             positive_values=False,
         ).values
 
         df.loc[
-            (state,), MAX_RUN_OF_INCREASING_PERCENT_POSITIVE_TESTS_FIELD
+            (state,), MAX_RUN_OF_INCREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD
         ] = get_max_run_in_window(
-            series_=df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_FIELD],
+            series_=df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD],
             window_size=14,
             positive_values=True,
         ).values
 
         df.loc[(state,), CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD] = (
-            df.loc[(state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_FIELD] >= 11
+            df.loc[(state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD]
+            >= 11
         ).values
 
         # Calculate 2B: Total test volume is stable or increasing.
-        df.loc[(state,), NEW_TESTS_TOTAL_DIFF_FIELD] = (
-            df.loc[(state,), NEW_TESTS_TOTAL_FIELD].diff(periods=1).values
+        df.loc[(state,), NEW_TESTS_TOTAL_DIFF_3DCS_FIELD] = (
+            df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD].diff(periods=1).values
         )
 
         df.loc[
-            (state,), MAX_RUN_OF_INCREASING_TOTAL_TESTS_FIELD
+            (state,), MAX_RUN_OF_INCREASING_TOTAL_TESTS_3DCS_FIELD
         ] = get_max_run_in_window(
-            series_=df.loc[(state,), NEW_TESTS_TOTAL_DIFF_FIELD],
+            series_=df.loc[(state,), NEW_TESTS_TOTAL_DIFF_3DCS_FIELD],
             window_size=14,
             positive_values=False,
         ).values
@@ -521,21 +566,31 @@ def transform_covidtracking_data(df):
             df.loc[
                 (state,),
                 # TODO: is this the correct specification?
-                MAX_RUN_OF_INCREASING_TOTAL_TESTS_FIELD,
+                MAX_RUN_OF_INCREASING_TOTAL_TESTS_3DCS_FIELD,
             ]
             >= 11
         ).values
 
         # Calculate 2C: 14th day [of positive percentage of tests] must be lower than 1st day.
         df.loc[(state,), CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD] = (
-            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD].diff(periods=14) < 0
+            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD].diff(periods=14) < 0
+        ).values
+
+        # Calculate 2D: Near-zero percent positive tests. [What is the explicit threshold here?]
+        df.loc[(state,), CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD] = (
+            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] <= 0.01
         ).values
 
         # Calculate all of the criteria combined in category 2.
         df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD] = (
-            df.loc[(state,), CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD]
-            & df.loc[(state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD]
-            & df.loc[(state,), CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD]
+            (
+                df.loc[(state,), CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD]
+                & df.loc[
+                    (state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD
+                ]
+                & df.loc[(state,), CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD]
+            )
+            | df.loc[(state,), CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD]
         ).values
 
         # Calculate all of the criteria combined.
