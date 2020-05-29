@@ -3,7 +3,12 @@ from df2gspread import df2gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 
-def post_covidtracking_data(df, workbook_key, tab_name, credentials):
+def post_dataframe_to_google_sheets(
+    df, workbook_key, tab_name, credentials, nan_replacement_value=""
+):
+    if nan_replacement_value is not None:
+        df = df.fillna(value=nan_replacement_value)
+
     print(f"Beginning to upload data to workbook {workbook_key} and tab {tab_name}...")
     df2gspread.upload(
         df=df,

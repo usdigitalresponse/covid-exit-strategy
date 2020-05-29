@@ -1,7 +1,12 @@
+import datetime
+
 import numpy as np
 import pandas as pd
 from rpy2 import robjects as robjects
 from scipy import interpolate as interpolate
+
+from covid.extract import DATE_SOURCE_FIELD
+from covid.extract import STATE_SOURCE_FIELD
 
 
 def fit_and_predict_cubic_spline(series_):
@@ -94,3 +99,81 @@ def get_max_run_in_window(series_, positive_values, window_size=14):
         returned_series[i] = consecutive_positive_or_negative_values.max()
 
     return returned_series
+
+
+def indication_of_rebound(float_):
+    indicator = "Clear"
+
+    if float_ >= 3:
+        indicator = "Caution"
+    if float_ >= 5:
+        indicator = "Rebound"
+
+    return indicator
+
+
+def generate_lag_column_name_formatter_and_column_names(column_name, num_lags=121):
+    column_name_formatter = f"{column_name}" + " T-{}"
+    lag_column_names = [column_name_formatter.format(lag) for lag in range(num_lags)]
+    # Put them in chronological order.
+    lag_column_names.reverse()
+
+    return column_name_formatter, lag_column_names
+
+
+def generate_lags(df, column, num_lags=121):
+    # TODO(lbrown): Refactor this method to be more efficient; this is just the quick and dirty way.
+    states = df[STATE_SOURCE_FIELD].unique()
+
+    column_names = [DATE_SOURCE_FIELD]
+
+    (
+        column_name_formatter,
+        lag_column_names,
+    ) = generate_lag_column_name_formatter_and_column_names(
+        column_name=column, num_lags=num_lags
+    )
+
+    column_names.extend(lag_column_names)
+
+    lags_df = pd.DataFrame(
+        index=pd.Index(data=states, name=STATE_SOURCE_FIELD), columns=column_names
+    )
+
+    today = pd.to_datetime(df[DATE_SOURCE_FIELD]).max()
+    lags_df[DATE_SOURCE_FIELD] = today
+    for state in states:
+        # Start each state looking up today.
+        date_to_lookup = today
+
+        for lag in range(num_lags):
+            print(f"For field {column}, processing {state} for lag {lag}.")
+            # Lookup the historical entry.
+            value = df.loc[
+                (df[STATE_SOURCE_FIELD] == state)
+                & (df[DATE_SOURCE_FIELD] == date_to_lookup),
+                column,
+            ]
+
+            if len(value) > 1:
+                raise ValueError("Too many or too few values returned.")
+            elif len(value) == 1:
+                value = value.iloc[0]
+                lags_df.loc[state, column_name_formatter.format(lag)] = value
+
+            date_to_lookup = date_to_lookup - datetime.timedelta(days=1)
+
+    lags_df = lags_df.reset_index()
+    return lags_df
+
+
+def calculate_state_summary(transformed_df, columns):
+    # Find current date, and drop all other rows.
+    current_date = transformed_df.loc[:, DATE_SOURCE_FIELD].max()
+
+    state_summary_df = transformed_df.copy()
+    state_summary_df = state_summary_df.loc[
+        state_summary_df[DATE_SOURCE_FIELD] == current_date, columns
+    ]
+
+    return state_summary_df

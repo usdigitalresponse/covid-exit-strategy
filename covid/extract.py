@@ -31,9 +31,10 @@ def extract_covidtracking_historical_data():
 
 
 def extract_state_population_data():
-    df = pd.read_csv("./data/population.csv")
+    # Note that the working directory is assumed to be the repository root.
+    df = pd.read_csv("./covid/data/population.csv")
 
-    with open("./data/us_state_abbreviations.json") as state_abbreviations_file:
+    with open("./covid/data/us_state_abbreviations.json") as state_abbreviations_file:
         abbreviations = json.load(state_abbreviations_file)
 
     df = df.replace({STATE_SOURCE_FIELD: abbreviations})
