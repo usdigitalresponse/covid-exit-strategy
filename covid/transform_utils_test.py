@@ -11,7 +11,7 @@ from covid.transform_utils import get_consecutive_positive_or_negative_values
 from covid.transform_utils import get_max_run_in_window
 
 
-class MainTest(unittest.TestCase):
+class TransformUtilsTest(unittest.TestCase):
     def test_find_consecutive_positive_values(self):
         assert_series_equal(
             get_consecutive_positive_or_negative_values(
