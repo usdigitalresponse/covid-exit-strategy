@@ -95,6 +95,7 @@ CDC_CRITERIA_2_COMBINED_FIELD = "cdc_criteria_2_combined"
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
+CDC_CRITERIA_ALL_COMBINED_OR_FIELD = "cdc_criteria_all_combined_using_or"
 LAST_UPDATED_FIELD = "last_updated"
 
 # Define the list of columns that should appear in the state summary tab.
@@ -118,6 +119,7 @@ STATE_SUMMARY_COLUMNS = [
     CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
     CDC_CRITERIA_2_COMBINED_FIELD,
     CDC_CRITERIA_ALL_COMBINED_FIELD,
+    CDC_CRITERIA_ALL_COMBINED_OR_FIELD,
 ]
 
 # Define the names of the tabs to upload to.
@@ -562,13 +564,17 @@ def transform_covidtracking_data(df):
             positive_values=False,
         ).values
 
+        # df.loc[(state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD] = (
+        #     df.loc[
+        #         (state,),
+        #         # TODO: is this the correct specification?
+        #         MAX_RUN_OF_INCREASING_TOTAL_TESTS_3DCS_FIELD,
+        #     ]
+        #     >= 11
+        # ).values
+
         df.loc[(state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD] = (
-            df.loc[
-                (state,),
-                # TODO: is this the correct specification?
-                MAX_RUN_OF_INCREASING_TOTAL_TESTS_3DCS_FIELD,
-            ]
-            >= 11
+            df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD].diff(periods=14) >= 0
         ).values
 
         # Calculate 2C: 14th day [of positive percentage of tests] must be lower than 1st day.
@@ -597,6 +603,12 @@ def transform_covidtracking_data(df):
         df.loc[(state,), CDC_CRITERIA_ALL_COMBINED_FIELD] = (
             df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD]
             & df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
+        ).values
+
+        # Calculate all of the criteria combined.
+        df.loc[(state,), CDC_CRITERIA_ALL_COMBINED_OR_FIELD] = (
+            df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD]
+            | df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
         ).values
 
     # Add an update time.
