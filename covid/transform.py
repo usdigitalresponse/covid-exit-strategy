@@ -1,23 +1,17 @@
 import datetime
-import json
 
-import gspread
-import numpy as np
 import pandas as pd
-import requests
-import rpy2.robjects as robjects
-import scipy.interpolate as interpolate
-from df2gspread import df2gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
+from covid.extract import DATE_SOURCE_FIELD
+from covid.extract import extract_state_population_data
+from covid.extract import NEW_CASES_NEGATIVE_SOURCE_FIELD
+from covid.extract import NEW_CASES_POSITIVE_SOURCE_FIELD
+from covid.extract import STATE_SOURCE_FIELD
+from covid.extract import TOTAL_CASES_SOURCE_FIELD
+from covid.transform_utils import fit_and_predict_cubic_spline_in_r
+from covid.transform_utils import get_consecutive_positive_or_negative_values
+from covid.transform_utils import get_max_run_in_window
 
-# Define source field names.
-DATE_SOURCE_FIELD = "date"
-STATE_SOURCE_FIELD = "state"
-TOTAL_CASES_SOURCE_FIELD = "positive"
-NEW_CASES_NEGATIVE_SOURCE_FIELD = "negativeIncrease"
-NEW_CASES_POSITIVE_SOURCE_FIELD = "positiveIncrease"
-LAST_UPDATED_SOURCE_FIELD = "dateModified"
 
 # Define output field names.
 # Criteria Category 1 Fields.
@@ -122,31 +116,6 @@ STATE_SUMMARY_COLUMNS = [
     CDC_CRITERIA_ALL_COMBINED_OR_FIELD,
 ]
 
-# Define the names of the tabs to upload to.
-CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY = "1s534JoVjsetLDUxzkww3yQSnRj9H-8QLMKPUrq7RAuc"
-FOR_WEBSITE_TAB_NAME = "For Website"
-ALL_STATE_DATA_TAB_NAME = "All State Data"
-WORK_IN_PROGRESS_NY_ONLY_TAB_NAME = "Work in Progress (NY Only)"
-STATE_SUMMARY_TAB_NAME = "State Summary"
-
-
-def load_covidtracking_current_data():
-    current_url = "https://covidtracking.com/api/v1/states/current.json"
-    current_data = requests.get(current_url).json()
-    current_df = pd.DataFrame(current_data)
-
-    return current_df
-
-
-def load_covidtracking_historical_data():
-    historical_url = "https://covidtracking.com/api/v1/states/daily.json"
-    historical_data = requests.get(historical_url).json()
-    historical_df = pd.DataFrame(historical_data)
-
-    historical_df[DATE_SOURCE_FIELD] = historical_df[DATE_SOURCE_FIELD].astype(str)
-
-    return historical_df
-
 
 def transform_covidtracking_data_old(df):
     total_case_column_name_formatter = "total_cases_t_minus_{}"
@@ -225,78 +194,6 @@ def transform_covidtracking_data_old(df):
     return transformed_df
 
 
-def fit_and_predict_cubic_spline(series_):
-    # Assert that the index is sorted.
-    if not series_.index.is_monotonic_increasing:
-        raise ValueError("Index is not sorted.")
-
-    # Create a replacement index.
-    # Note: the datetime index fails due to this line in the numpy code:
-    # `if not np.all(diff(x) >= 0.0):`
-    # The `diff(x)` generates timedeltas which cannot be compared to the float `0.0`.
-    substitute_index = [i for i in range(len(series_))]
-
-    # Note: you can't simply uses pd.Series.interpolate because that will only fill in data for the `nan` values.
-    predicted_spline_values = interpolate.UnivariateSpline(
-        x=substitute_index, y=series_.values, k=3
-    )(substitute_index)
-
-    predicted_spline_series = pd.Series(
-        data=predicted_spline_values, index=series_.index
-    )
-
-    return predicted_spline_series
-
-
-def fit_and_predict_cubic_spline_in_r(
-    series_, smoothing_parameter=None, replace_nan=True
-):
-    if not smoothing_parameter:
-        # Import `NULL` from R.
-        smoothing_parameter = robjects.r["as.null"]()
-
-    # Assert that the index is sorted.
-    if not series_.index.is_monotonic_increasing:
-        raise ValueError("Index is not sorted.")
-
-    # Replace nans
-    if replace_nan:
-        series_ = series_.fillna(value=0)
-
-    r_x = robjects.DateVector(series_.index)
-    r_y = robjects.FloatVector(series_.values.astype(float))
-
-    # Extract R's smoothing function.
-    r_smooth_spline = robjects.r["smooth.spline"]
-
-    # For reference, the CDC uses this method with an `spar` of .5, as seen in line 384 of `Trajectory Analysis.R`:
-    # https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/smooth.spline
-    fitted_spline = r_smooth_spline(x=r_x, y=r_y, spar=smoothing_parameter)
-
-    predicted_spline_values = list(
-        robjects.r["predict"](fitted_spline, robjects.FloatVector(r_x)).rx2("y")
-    )
-
-    predicted_spline_series = pd.Series(
-        data=predicted_spline_values, index=series_.index
-    )
-
-    return predicted_spline_series
-
-
-def load_state_population_data():
-    df = pd.read_csv("./data/population.csv")
-
-    with open("./data/us_state_abbreviations.json") as state_abbreviations_file:
-        abbreviations = json.load(state_abbreviations_file)
-
-    df = df.replace({STATE_SOURCE_FIELD: abbreviations})
-
-    df = df.set_index(keys=[STATE_SOURCE_FIELD])
-
-    return df
-
-
 def transform_covidtracking_data(df):
     states = df[STATE_SOURCE_FIELD].unique()
 
@@ -310,7 +207,7 @@ def transform_covidtracking_data(df):
     df = df.sort_index()
 
     # Load state population data.
-    state_population_data = load_state_population_data()
+    state_population_data = extract_state_population_data()
 
     for state in states:
         print(f"Processing state {state}...")
@@ -620,67 +517,6 @@ def transform_covidtracking_data(df):
     return df
 
 
-def get_consecutive_positive_or_negative_values(series_, positive_values=True):
-    meets_criteria = series_ >= 0 if positive_values else series_ < 0
-    consecutive_positive_values = meets_criteria * (
-        meets_criteria.groupby(
-            (meets_criteria != meets_criteria.shift()).cumsum()
-        ).cumcount()
-        + 1
-    )
-    return consecutive_positive_values
-
-
-def get_max_run_in_window(series_, positive_values, window_size=14):
-    # Assert that the index is sorted.
-    if not series_.index.is_monotonic_increasing:
-        raise ValueError("Index is not sorted.")
-
-    returned_series = pd.Series(index=series_.index, data=np.nan)
-
-    for i in range(window_size - 1, len(series_)):
-        # Start calculating the run of values that happened *within (and only within)* this window.
-        # TODO(lbrown): this is incredibly inefficient, but I can't think of a faster way while following the right
-        #  interpretation of the rules.
-        consecutive_positive_or_negative_values = get_consecutive_positive_or_negative_values(
-            series_=series_.iloc[i + 1 - window_size : i + 1],
-            positive_values=positive_values,
-        )
-
-        # Find the max run.
-        returned_series[i] = consecutive_positive_or_negative_values.max()
-
-    return returned_series
-
-
-def post_covidtracking_data(df, workbook_key, tab_name, credentials):
-    print(f"Beginning to upload data to workbook {workbook_key} and tab {tab_name}...")
-    df2gspread.upload(
-        df=df,
-        gfile=workbook_key,
-        wks_name=tab_name,
-        credentials=credentials,
-        # Do not include the index in the upload.
-        row_names=False,
-        col_names=True,
-    )
-    print("Finished uploading data.")
-
-
-# TODO(lbrown): this was created when I was using the Sheets API, at this point we may only need the credentials.
-def get_sheets_client():
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(
-        "service-account-key.json", scope
-    )
-    client = gspread.authorize(credentials)
-
-    return client, credentials
-
-
 def calculate_state_summary(transformed_df):
     # Find current date, and drop all other rows.
     current_date = transformed_df.loc[:, DATE_SOURCE_FIELD].max()
@@ -691,36 +527,3 @@ def calculate_state_summary(transformed_df):
     ]
 
     return state_summary_df
-
-
-if __name__ == "__main__":
-    df = load_covidtracking_historical_data()
-    transformed_df = transform_covidtracking_data(df=df)
-
-    client, credentials = get_sheets_client()
-
-    state_summary = calculate_state_summary(transformed_df=transformed_df)
-
-    # Upload data for just CA.
-    post_covidtracking_data(
-        df=transformed_df.loc[transformed_df[STATE_SOURCE_FIELD] == "NY",],
-        workbook_key=CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY,
-        tab_name=WORK_IN_PROGRESS_NY_ONLY_TAB_NAME,
-        credentials=credentials,
-    )
-
-    # Upload summary for all states.
-    post_covidtracking_data(
-        df=state_summary,
-        workbook_key=CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY,
-        tab_name=STATE_SUMMARY_TAB_NAME,
-        credentials=credentials,
-    )
-
-    # Upload data for all states.
-    post_covidtracking_data(
-        df=transformed_df,
-        workbook_key=CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY,
-        tab_name=ALL_STATE_DATA_TAB_NAME,
-        credentials=credentials,
-    )
