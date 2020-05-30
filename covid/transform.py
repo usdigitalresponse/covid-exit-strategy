@@ -4,6 +4,7 @@ import pandas as pd
 
 from covid.extract import DATE_SOURCE_FIELD
 from covid.extract import extract_state_population_data
+from covid.extract import get_state_abbreviations_to_names
 from covid.extract import NEW_CASES_NEGATIVE_SOURCE_FIELD
 from covid.extract import NEW_CASES_POSITIVE_SOURCE_FIELD
 from covid.extract import STATE_SOURCE_FIELD
@@ -13,7 +14,6 @@ from covid.transform_utils import generate_lag_column_name_formatter_and_column_
 from covid.transform_utils import generate_lags
 from covid.transform_utils import get_consecutive_positive_or_negative_values
 from covid.transform_utils import get_max_run_in_window
-from covid.transform_utils import indication_of_rebound
 
 
 # Define output field names.
@@ -25,8 +25,12 @@ NEW_CASES_3DCS_FIELD = "New Cases (3DCS)"
 NEW_CASES_FIELD = "new_cases"
 NEW_CASES_DIFF_FIELD = "new_cases_compared_to_yesterday"
 NEW_CASES_3DCS_DIFF_FIELD = "new_cases_compared_to_yesterday_3DCS"
-CONSECUTIVE_INCREASE_NEW_CASES_3DCS_FIELD = "consecutive_increase_in_new_cases_3DCS"
-CONSECUTIVE_DECREASE_NEW_CASES_3DCS_FIELD = "consecutive_decrease_in_new_cases_3DCS"
+CONSECUTIVE_INCREASE_NEW_CASES_3DCS_FIELD = (
+    "Consecutive Days Increasing New Cases (3DCS)"
+)
+CONSECUTIVE_DECREASE_NEW_CASES_3DCS_FIELD = (
+    "Consecutive Days Decreasing New Cases (3DCS)"
+)
 MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD = (
     "Max Days Increasing in 14 Day Window (3DCS)"
 )
@@ -60,6 +64,7 @@ POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD = "positive_tests_3_day_average"
 POSITIVE_TESTS_TOTAL_3DCS_FIELD = "positive_tests_3dcs"
 NEW_TESTS_TOTAL_DIFF_3DCS_FIELD = "new_tests_total_compared_to_yesterday_3dcs"
 PERCENT_POSITIVE_NEW_TESTS_FIELD = "percent_positive_new_tests"
+FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD = "Fraction Postive Tests (3DCS)"
 PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD = "% Positive Tests (3DCS)"
 PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD = (
     "percent_positive_new_tests_compared_to_yesterday_3dcs"
@@ -72,31 +77,21 @@ MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD = (
 )
 MAX_RUN_OF_INCREASING_TOTAL_TESTS_3DCS_FIELD = "max_run_of_increasing_total_tests_3dcs"
 
-CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD = (
-    "cdc_criteria_2a_covid_percent_continuous_decline"
-)
-
-CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD = (
-    "cdc_criteria_2b_covid_total_test_volume_increasing"
-)
-
-CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD = (
-    "cdc_criteria_2c_covid_percent_overall_decline"
-)
-
-CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD = (
-    "cdc_criteria_2d_covid_near_zero_positive_tests"
-)
-CDC_CRITERIA_2_COMBINED_FIELD = "cdc_criteria_2_combined"
+CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD = "CDC Criteria 2A"
+CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD = "CDC Criteria 2B"
+CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD = "CDC Criteria 2C"
+CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD = "CDC Criteria 2D"
+CDC_CRITERIA_2_COMBINED_FIELD = "CDC Criteria 2 (Combined)"
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
 CDC_CRITERIA_ALL_COMBINED_OR_FIELD = "cdc_criteria_all_combined_using_or"
 LAST_UPDATED_FIELD = "last_updated"
+STATE_FIELD = "State"
 
 # Define the list of columns that should appear in the state summary tab.
 STATE_SUMMARY_COLUMNS = [
-    STATE_SOURCE_FIELD,
+    STATE_FIELD,
     DATE_SOURCE_FIELD,
     TOTAL_CASES_SOURCE_FIELD,
     TOTAL_CASES_3_DAY_AVERAGE_CUBIC_SPLINE_FIELD,
@@ -125,13 +120,15 @@ _, new_cases_3dcs_lag_fields = generate_lag_column_name_formatter_and_column_nam
 )
 
 CRITERIA_1_SUMMARY_COLUMNS = [
-    STATE_SOURCE_FIELD,
+    STATE_FIELD,
     CDC_CRITERIA_1_COMBINED_FIELD,
     # Unpack all of the T-120 to T-0 lag fields.
     *new_cases_3dcs_lag_fields,
     NEW_CASES_3DCS_FIELD,
+    CONSECUTIVE_DECREASE_NEW_CASES_3DCS_FIELD,
     MAX_RUN_OF_DECREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD,
     INDICATION_OF_NEW_CASES_REBOUND_FIELD,
+    CONSECUTIVE_INCREASE_NEW_CASES_3DCS_FIELD,
     MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD,
     CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD,
     CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
@@ -152,11 +149,15 @@ _, test_volume_lag_fields = generate_lag_column_name_formatter_and_column_names(
 
 
 CRITERIA_2_SUMMARY_COLUMNS = [
-    STATE_SOURCE_FIELD,
+    STATE_FIELD,
     CDC_CRITERIA_2_COMBINED_FIELD,
     # Unpack all of the T-30 to T-0 lag fields.
     *test_volume_lag_fields,
+    # Repeat the T-0 new cases field to serve as a spacer between sparklines.
+    NEW_TESTS_TOTAL_3DCS_FIELD,
     *percent_positive_3dcs_lag_fields,
+    # Repeat the T-0 percent positive field to serve as a spacer between sparklines.
+    PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD,
     CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD,
     CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD,
     CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
@@ -165,6 +166,10 @@ CRITERIA_2_SUMMARY_COLUMNS = [
 
 
 def transform_covidtracking_data(df):
+
+    # Replace abbreviations with full names.
+    state_abbreviations_to_names = get_state_abbreviations_to_names()
+    df = df.replace({STATE_SOURCE_FIELD: state_abbreviations_to_names})
     states = df[STATE_SOURCE_FIELD].unique()
 
     # Make the date column explicitly a date
@@ -268,12 +273,6 @@ def transform_covidtracking_data(df):
             window_size=14,
         ).values
 
-        df.loc[(state,), INDICATION_OF_NEW_CASES_REBOUND_FIELD] = (
-            df.loc[
-                (state,), MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
-            ].apply(func=indication_of_rebound)
-        ).values
-
         df.loc[(state,), CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD] = (
             df.loc[
                 (state,), MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
@@ -297,7 +296,6 @@ def transform_covidtracking_data(df):
             .sum()
             .values
         )
-
         state_population = float(state_population_data.loc[state][0])
         df.loc[
             (state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_FIELD
@@ -342,6 +340,17 @@ def transform_covidtracking_data(df):
             ]
         ).values
 
+        # Calculate a textual indicator function for the rebound.
+        df.loc[(state,), INDICATION_OF_NEW_CASES_REBOUND_FIELD] = (
+            df.loc[
+                (state,),
+                [
+                    MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD,
+                    CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
+                ],
+            ].apply(func=indication_of_rebound, axis=1)
+        ).values
+
         # Calculate all of the criteria combined in category 1.
         df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD] = (
             (
@@ -358,6 +367,13 @@ def transform_covidtracking_data(df):
             df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD]
             + df.loc[(state,), NEW_CASES_NEGATIVE_SOURCE_FIELD]
         ).values
+
+        new_tests_total_negatives_removed = df.loc[
+            (state,), NEW_TESTS_TOTAL_FIELD
+        ].values
+        new_tests_total_negatives_removed[new_tests_total_negatives_removed < 0] = None
+
+        df.loc[(state,), NEW_TESTS_TOTAL_FIELD] = new_tests_total_negatives_removed
 
         df.loc[(state,), NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD] = (
             df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
@@ -392,9 +408,13 @@ def transform_covidtracking_data(df):
             / df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
         ).values
 
-        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
+        df.loc[(state,), FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
             df.loc[(state,), POSITIVE_TESTS_TOTAL_3DCS_FIELD].astype(float)
             / df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD]
+        ).values
+
+        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
+            100.0 * df.loc[(state,), FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD]
         ).values
 
         df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD] = (
@@ -437,15 +457,6 @@ def transform_covidtracking_data(df):
             positive_values=False,
         ).values
 
-        # df.loc[(state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD] = (
-        #     df.loc[
-        #         (state,),
-        #         # TODO: is this the correct specification?
-        #         MAX_RUN_OF_INCREASING_TOTAL_TESTS_3DCS_FIELD,
-        #     ]
-        #     >= 11
-        # ).values
-
         df.loc[(state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD] = (
             df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD].diff(periods=14) >= 0
         ).values
@@ -457,7 +468,7 @@ def transform_covidtracking_data(df):
 
         # Calculate 2D: Near-zero percent positive tests. [What is the explicit threshold here?]
         df.loc[(state,), CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD] = (
-            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] <= 0.01
+            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] <= 1
         ).values
 
         # Calculate all of the criteria combined in category 2.
@@ -501,4 +512,22 @@ def transform_covidtracking_data(df):
             right=lags, on=[STATE_SOURCE_FIELD, DATE_SOURCE_FIELD], how="left"
         )
 
+    # Copy state values into column called "State" instead of "state".
+    df[STATE_FIELD] = df[STATE_SOURCE_FIELD]
+
     return df
+
+
+def indication_of_rebound(series_):
+    indicator = None
+    if series_[CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE] is True:
+        indicator = "Low Case Count"
+    else:
+        if series_[MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD] >= 0:
+            indicator = "Clear"
+        if series_[MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD] >= 3:
+            indicator = "Caution"
+        if series_[MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD] >= 5:
+            indicator = "Rebound"
+
+    return indicator

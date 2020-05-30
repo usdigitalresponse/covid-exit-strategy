@@ -34,11 +34,13 @@ def extract_state_population_data():
     # Note that the working directory is assumed to be the repository root.
     df = pd.read_csv("./covid/data/population.csv")
 
-    with open("./covid/data/us_state_abbreviations.json") as state_abbreviations_file:
-        abbreviations = json.load(state_abbreviations_file)
-
-    df = df.replace({STATE_SOURCE_FIELD: abbreviations})
-
     df = df.set_index(keys=[STATE_SOURCE_FIELD])
 
     return df
+
+
+def get_state_abbreviations_to_names():
+    with open("./covid/data/us_state_abbreviations.json") as state_abbreviations_file:
+        abbreviations = json.load(state_abbreviations_file)
+
+    return abbreviations

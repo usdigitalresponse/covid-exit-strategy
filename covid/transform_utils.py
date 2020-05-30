@@ -69,7 +69,7 @@ def fit_and_predict_cubic_spline_in_r(
 
 
 def get_consecutive_positive_or_negative_values(series_, positive_values=True):
-    meets_criteria = series_ >= 0 if positive_values else series_ < 0
+    meets_criteria = series_ > 0 if positive_values else series_ < 0
     consecutive_positive_values = meets_criteria * (
         meets_criteria.groupby(
             (meets_criteria != meets_criteria.shift()).cumsum()
@@ -99,17 +99,6 @@ def get_max_run_in_window(series_, positive_values, window_size=14):
         returned_series[i] = consecutive_positive_or_negative_values.max()
 
     return returned_series
-
-
-def indication_of_rebound(float_):
-    indicator = "Clear"
-
-    if float_ >= 3:
-        indicator = "Caution"
-    if float_ >= 5:
-        indicator = "Rebound"
-
-    return indicator
 
 
 def generate_lag_column_name_formatter_and_column_names(column_name, num_lags=121):
