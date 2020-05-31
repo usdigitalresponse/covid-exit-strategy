@@ -10,7 +10,7 @@ The documents for this project are kept in [Google Drive](https://drive.google.c
 The data for the website currently comes from [this workbook](https://docs.google.com/spreadsheets/d/1ZhwP0GZTz50myibSaWsMXOVQKx9DQaJO4rN1i58Rrjc/edit#gid=712897421),
 which also includes tabs that Ryan refreshes on a regular basis with updated copied data.
 
-The meaning of the CDC criteria are spelled out in our interpretation in [this workbook](https://docs.google.com/spreadsheets/u/1/d/1q9yZaQ1_qwEecvYknS1sZsRbD6eDY7il_uIX2dInbr0/edit?usp=drive_web&ouid=109155667631110887569).
+The meaning of the CDC criteria ([defined here](https://drive.google.com/file/d/1zWLHPIz6UWiwrI5tYz1roy1t9PpqE0dj/view?usp=sharing)) are spelled out in our interpretation in [this workbook](https://docs.google.com/spreadsheets/u/1/d/1q9yZaQ1_qwEecvYknS1sZsRbD6eDY7il_uIX2dInbr0/edit?usp=drive_web&ouid=109155667631110887569).
 
 # Posting data through these scripts
 
