@@ -1,6 +1,7 @@
 # Define source field names.
 import os
 
+from covid.constants import PATH_TO_SERVICE_ACCOUNT_KEY
 from covid.extract import extract_covidtracking_historical_data
 from covid.extract import STATE_SOURCE_FIELD
 from covid.load import get_sheets_client
@@ -24,7 +25,6 @@ CDC_CRITERIA_2_GOOGLE_WORKBOOK_KEY = "1xdePOZkXXv49_15YTloLr7D72eQhY9R-ZEhoMr-4U
 
 # Note: if you'd like to run the full pipeline, you'll need to generate a service account keyfile for an account
 # that has been given write access to the Google Sheet.
-PATH_TO_SERVICE_ACCOUNT_KEY = "service-account-key.json"
 
 
 def extract_transform_and_load_covid_data():
