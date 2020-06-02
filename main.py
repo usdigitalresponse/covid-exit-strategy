@@ -29,10 +29,10 @@ CDC_CRITERIA_3_GOOGLE_WORKBOOK_KEY = "1-BSd5eFbNsypygMkhuGX1OWoUsF2u4chpsu6aC4cg
 
 
 def extract_transform_and_load_covid_data():
-    # df = extract_covidtracking_historical_data()
+    df = extract_covidtracking_historical_data()
     bed_df = extract_gsheets_hospital_bed_data()
 
-    # transformed_df = transform_covidtracking_data(df=df)
+    transformed_df = transform_covidtracking_data(df=df)
     transformed_bed_df = transform_hospital_bed_data(bed_df=bed_df)
 
     client, credentials = get_sheets_client(
