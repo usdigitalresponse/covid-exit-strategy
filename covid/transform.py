@@ -7,6 +7,8 @@ from covid.extract import extract_state_population_data
 from covid.extract import get_state_abbreviations_to_names
 from covid.extract import NEW_CASES_NEGATIVE_SOURCE_FIELD
 from covid.extract import NEW_CASES_POSITIVE_SOURCE_FIELD
+from covid.extract import PERCENT_ICU_BEDS_OCCUPIED_FIELD
+from covid.extract import PERCENT_INPATIENT_BEDS_OCCUPIED
 from covid.extract import STATE_SOURCE_FIELD
 from covid.extract import TOTAL_CASES_SOURCE_FIELD
 from covid.transform_utils import fit_and_predict_cubic_spline_in_r
@@ -82,6 +84,15 @@ CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD = "CDC Criteria 2B"
 CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD = "CDC Criteria 2C"
 CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD = "CDC Criteria 2D"
 CDC_CRITERIA_2_COMBINED_FIELD = "CDC Criteria 2 (Combined)"
+
+
+# Criteria Category 3 Fields.
+MAX_ICU_BED_OCCUPATION_7_DAYS = "max_icu_bed_occupation_7_days"
+MAX_INPATIENT_BED_OCCUPATION_7_DAYS = "max_inpatient_bed_occupation_7_days"
+CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD = "CDC Criteria 3A"
+CDC_CRITERIA_3_COMBINED_FIELD = "CDC Criteria 3 (Combined)"
+PHASE_1_OCCUPATION_THRESHOLD = 0.80  # Beds must be less than 80% full
+
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
@@ -549,6 +560,19 @@ def transform_cdc_ili_data(df):
     df = df.set_index(keys=[STATE_FIELD, DATE_SOURCE_FIELD])
 
     return df
+
+
+def transform_hospital_bed_data(bed_df):
+    # Calculate 3A: ICU and in-patient beds must have < 80% utilization for 7 consecutive days
+
+    bed_df[MAX_ICU_BED_OCCUPATION_7_DAYS] = bed_df[PERCENT_ICU_BEDS_OCCUPIED_FIELD]
+    bed_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] = bed_df[
+        PERCENT_INPATIENT_BEDS_OCCUPIED
+    ]
+    bed_df[CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD] = (
+        bed_df < PHASE_1_OCCUPATION_THRESHOLD
+    ).all(axis=1)
+    return bed_df
 
 
 def indication_of_rebound(series_):
