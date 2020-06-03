@@ -28,13 +28,9 @@ NEW_CASES_POSITIVE_SOURCE_FIELD = "positiveIncrease"
 LAST_UPDATED_SOURCE_FIELD = "dateModified"
 
 # For bed utilization data
-MASTER_DATA_GOOGLE_SHEET_KEY = (
-    "1ZhwP0GZTz50myibSaWsMXOVQKx9DQaJO4rN1i58Rrjc"  # covidexitstrategy.org sheet
-)
-INPATIENT_BEDS_TAB_NAME = "cdc.gov - % inpatient beds"
-ICU_BEDS_TAB_NAME = "cdc.gov - % icu beds"
-PERCENT_ICU_BEDS_OCCUPIED_FIELD = "% of ICU Beds Occupied"
-PERCENT_INPATIENT_BEDS_OCCUPIED = "% of Inpatient Beds Occupied"
+CATEGORY_3_DATA_GOOGLE_SHEET_KEY = "1-BSd5eFbNsypygMkhuGX1OWoUsF2u4chpsu6aC4cgVo"
+INPATIENT_BEDS_TAB_NAME = "Inpatient Bed Occupancy Data"
+ICU_BEDS_TAB_NAME = "ICU Bed Occupancy Data"
 
 
 def _df_from_tab_name(sheet, tab_name, index_column):
@@ -68,7 +64,7 @@ def extract_gsheets_hospital_bed_data():
     client, _ = get_sheets_client(
         credential_file_path=os.path.abspath(PATH_TO_SERVICE_ACCOUNT_KEY)
     )
-    master_sheet = client.open_by_key(MASTER_DATA_GOOGLE_SHEET_KEY)
+    master_sheet = client.open_by_key(CATEGORY_3_DATA_GOOGLE_SHEET_KEY)
 
     bed_dfs = []
     for worksheet_title in [INPATIENT_BEDS_TAB_NAME, ICU_BEDS_TAB_NAME]:
@@ -78,12 +74,7 @@ def extract_gsheets_hospital_bed_data():
         bed_dfs.append(df)
 
     bed_df = pd.concat(bed_dfs, axis=1)
-    bed_df_subset = bed_df[
-        [PERCENT_ICU_BEDS_OCCUPIED_FIELD, PERCENT_INPATIENT_BEDS_OCCUPIED]
-    ]
-    bed_df_decimals = bed_df_subset.applymap(
-        lambda x: round(float(x.strip("%")) / 100, 2)
-    )
+    bed_df_decimals = bed_df.applymap(lambda x: round(float(x.strip("%")) / 100, 2))
     return bed_df_decimals
 
 

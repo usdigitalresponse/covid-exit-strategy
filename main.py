@@ -2,6 +2,7 @@
 import os
 
 from covid.constants import PATH_TO_SERVICE_ACCOUNT_KEY
+from covid.extract import extract_covidtracking_historical_data
 from covid.extract import extract_gsheets_hospital_bed_data
 from covid.extract import STATE_SOURCE_FIELD
 from covid.load import get_sheets_client
@@ -9,6 +10,7 @@ from covid.load import post_dataframe_to_google_sheets
 from covid.transform import CRITERIA_1_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_2_SUMMARY_COLUMNS
 from covid.transform import STATE_SUMMARY_COLUMNS
+from covid.transform import transform_covidtracking_data
 from covid.transform import transform_hospital_bed_data
 from covid.transform_utils import calculate_state_summary
 
