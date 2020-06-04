@@ -524,6 +524,29 @@ def transform_covidtracking_data(df):
     return df
 
 
+def transform_cdc_ili_data(df):
+
+    # Use the first row of the index as the index names.
+    df.index.names = df.index[0]
+
+    # Drop the row containing the labels, and set a new multi-index using the region, year, and week.
+    df = df.iloc[1:].reset_index()
+
+    # Validate that the only region type is states to sanity check data.
+    assert set(df["REGION TYPE"].unique()) == {"States"}
+
+    # Create a new column that combines the `YEAR` and `WEEK` column.
+    # Note: the `-1` sets these timestamp at Monday of each week.
+    df["_WEEK_TIMESTAMP"] = pd.to_datetime(
+        df["YEAR"] + "-W" + df["WEEK"] + "-1", format="%Y-W%W-%w"
+    )
+
+    # Create a new multi-index containing the state name (`REGION`) and timestamp of the week.
+    df = df.set_index(keys=["REGION", "_WEEK_TIMESTAMP"])
+
+    return df
+
+
 def indication_of_rebound(series_):
     indicator = None
     if series_[CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE] is True:
