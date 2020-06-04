@@ -525,7 +525,6 @@ def transform_covidtracking_data(df):
 
 
 def transform_cdc_ili_data(df):
-
     # Use the first row of the index as the index names.
     df.index.names = df.index[0]
 
