@@ -9,6 +9,8 @@ import covid.extract_config.cdc_govcloud as cgc
 from covid.extract_utils import unzip_string
 
 
+# Define the names of the CSVs returned by the CDC's FluView dashboard API.
+# Note: data contained in these CSVs are used to calculate influenza-like-illness (ILI) criteria.
 ILI_NET_CSV = "ILINet.csv"
 WHO_NREVSS_PUBLIC_HEALTH_LABS_CSV = "WHO_NREVSS_Public_Health_Labs.csv"
 WHO_NREVSS_CLINICAL_LABS_CSV = "WHO_NREVSS_Clinical_Labs.csv"
