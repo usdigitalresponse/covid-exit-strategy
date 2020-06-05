@@ -512,6 +512,9 @@ def transform_covidtracking_data(df):
             right=lags, on=[STATE_SOURCE_FIELD, DATE_SOURCE_FIELD], how="left"
         )
 
+    # Drop American Samoa because it's not reporting data
+    df = df.loc[df[STATE_SOURCE_FIELD] != "American Samoa",]
+
     # Copy state values into column called "State" instead of "state".
     df[STATE_FIELD] = df[STATE_SOURCE_FIELD]
 
