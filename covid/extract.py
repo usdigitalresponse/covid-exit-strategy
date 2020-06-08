@@ -49,9 +49,10 @@ def get_state_abbreviations_to_names():
 
 def power_bi_extractor(response):
     data = json.loads(response.text)
+    timestamp = data['results'][0]['result']['data']['timestamp']
     value_list = data['results'][0]['result']['data']['dsr']['DS'][0]['PH'][1]['DM1']
     for vl in value_list:
-        yield vl['C']
+        yield vl['C'] + [timestamp]
 
 
 # CDC data source: https://www.cdc.gov/nhsn/covid19/report-patient-impact.html
@@ -62,10 +63,15 @@ def extract_cdc_inpatient_beds():
         ugc.URL,
         headers={**ugc.BASE_HEADERS, **ugc.INPATIENT_BED_HEADERS},
         data=open("./covid/extract_config/inpatient_bed_query.json"))
+    # breakpoint()
 
     df = pd.DataFrame(
         power_bi_extractor(response),
-        columns=["State", "inpatient_bed_percent_occupied", "inpatient_beds_occupied"])
+        columns=[
+            "State",
+            "inpatient_bed_percent_occupied",
+            "inpatient_beds_occupied",
+            "timestamp"])
 
     df = df.set_index('State')
 
@@ -81,7 +87,11 @@ def extract_cdc_icu_beds():
 
     df = pd.DataFrame(
         power_bi_extractor(response),
-        columns=["State", "icu_percent_occupied", "icu_beds_occupied"])
+        columns=[
+            "State",
+            "icu_percent_occupied",
+            "icu_beds_occupied",
+            "timestamp"])
 
     df = df.set_index('State')
 
@@ -93,10 +103,14 @@ def extract_cdc_facilities_reporting():
         ugc.URL,
         headers={**ugc.BASE_HEADERS, **ugc.FACILITIES_REPORTING_HEADERS},
         data=open("./covid/extract_config/facilities_reporting_query.json"))
-    
+
     df = pd.DataFrame(
         power_bi_extractor(response),
-        columns=["State", "facilities_percent_reporting", "facilities_reporting"])
+        columns=[
+            "State",
+            "facilities_percent_reporting",
+            "facilities_reporting",
+            "timestamp"])
 
     df = df.set_index('State')
 
