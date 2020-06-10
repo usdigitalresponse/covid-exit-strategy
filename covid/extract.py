@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 import requests
-import covid.extract_config.analysis_usgovcloudapi as ugc
+import covid.extract_config.cdc_govcloud as cgc
 
 
 DATE_SOURCE_FIELD = "date"
@@ -60,8 +60,8 @@ def power_bi_extractor(response):
 def extract_cdc_inpatient_beds():
     # State Representative Estimates for Percentage of Inpatient Beds Occupied (All Patients)
     response = requests.post(
-        ugc.URL,
-        headers={**ugc.BASE_HEADERS, **ugc.INPATIENT_BED_HEADERS},
+        cgc.URL,
+        headers={**cgc.BASE_HEADERS, **cgc.INPATIENT_BED_HEADERS},
         data=open("./covid/extract_config/inpatient_bed_query.json"))
     # breakpoint()
 
@@ -81,8 +81,8 @@ def extract_cdc_inpatient_beds():
 def extract_cdc_icu_beds():
     # State Representative Estimates for Percentage of ICU Beds Occupied (All Patients)
     response = requests.post(
-        ugc.URL,
-        headers={**ugc.BASE_HEADERS, **ugc.ICU_BED_HEADERS},
+        cgc.URL,
+        headers={**cgc.BASE_HEADERS, **cgc.ICU_BED_HEADERS},
         data=open("./covid/extract_config/icu_bed_query.json"))
 
     df = pd.DataFrame(
@@ -100,8 +100,8 @@ def extract_cdc_icu_beds():
 
 def extract_cdc_facilities_reporting():
     response = requests.post(
-        ugc.URL,
-        headers={**ugc.BASE_HEADERS, **ugc.FACILITIES_REPORTING_HEADERS},
+        cgc.URL,
+        headers={**cgc.BASE_HEADERS, **cgc.FACILITIES_REPORTING_HEADERS},
         data=open("./covid/extract_config/facilities_reporting_query.json"))
 
     df = pd.DataFrame(
