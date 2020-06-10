@@ -15,9 +15,6 @@ ILI_NET_CSV = "ILINet.csv"
 WHO_NREVSS_PUBLIC_HEALTH_LABS_CSV = "WHO_NREVSS_Public_Health_Labs.csv"
 WHO_NREVSS_CLINICAL_LABS_CSV = "WHO_NREVSS_Clinical_Labs.csv"
 
-from covid.constants import PATH_TO_SERVICE_ACCOUNT_KEY
-from covid.load import get_sheets_client
-
 
 DATE_SOURCE_FIELD = "date"
 STATE_SOURCE_FIELD = "state"
@@ -29,17 +26,6 @@ LAST_UPDATED_SOURCE_FIELD = "dateModified"
 
 # For bed utilization data
 CATEGORY_3_DATA_GOOGLE_SHEET_KEY = "1-BSd5eFbNsypygMkhuGX1OWoUsF2u4chpsu6aC4cgVo"
-INPATIENT_BEDS_TAB_NAME = "Inpatient Bed Occupancy Data"
-ICU_BEDS_TAB_NAME = "ICU Bed Occupancy Data"
-
-
-def _df_from_tab_name(sheet, tab_name, index_column):
-    worksheet = sheet.worksheet(tab_name)
-    records = worksheet.get_all_records()
-    df = pd.DataFrame(records)
-    if index_column is not None:
-        df = df.set_index(index_column)
-    return df
 
 
 def extract_covidtracking_current_data():
@@ -58,24 +44,6 @@ def extract_covidtracking_historical_data():
     historical_df[DATE_SOURCE_FIELD] = historical_df[DATE_SOURCE_FIELD].astype(str)
 
     return historical_df
-
-
-def extract_gsheets_hospital_bed_data():
-    client, _ = get_sheets_client(
-        credential_file_path=os.path.abspath(PATH_TO_SERVICE_ACCOUNT_KEY)
-    )
-    master_sheet = client.open_by_key(CATEGORY_3_DATA_GOOGLE_SHEET_KEY)
-
-    bed_dfs = []
-    for worksheet_title in [INPATIENT_BEDS_TAB_NAME, ICU_BEDS_TAB_NAME]:
-        df = _df_from_tab_name(
-            master_sheet, worksheet_title, index_column=CAPITAL_STATE_SOURCE_FIELD
-        )
-        bed_dfs.append(df)
-
-    bed_df = pd.concat(bed_dfs, axis=1)
-    bed_df_decimals = bed_df.applymap(lambda x: round(float(x.strip("%")) / 100, 2))
-    return bed_df_decimals
 
 
 def extract_state_population_data():
@@ -176,6 +144,9 @@ def extract_cdc_facilities_reporting():
     )
 
     df = df.set_index("State")
+            "timestamp",
+        ],
+    )
 
     return df
 
@@ -199,5 +170,15 @@ def extract_cdc_ili_data():
     filenames_to_contents_map = unzip_string(response.content)
 
     df = pd.read_csv(BytesIO(filenames_to_contents_map[ILI_NET_CSV]))
+    df = df.set_index("State")
 
     return df
+
+
+def extract_cdc_data():
+    inpatient_bed_df = extract_cdc_inpatient_beds()
+    icu_bed_df = extract_cdc_icu_beds()
+    hospitals_reporting_df = extract_cdc_facilities_reporting()
+    cdc_df = pd.concat([inpatient_bed_df, icu_bed_df, hospitals_reporting_df], axis=1)
+    cdc_df = cdc_df.loc[:, ~cdc_df.columns.duplicated()]
+    return cdc_df

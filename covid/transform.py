@@ -528,7 +528,9 @@ def transform_covidtracking_data(df):
         )
 
     # Drop American Samoa because it's not reporting data
-    df = df.loc[df[STATE_SOURCE_FIELD] != "American Samoa",]
+    df = df.loc[
+        df[STATE_SOURCE_FIELD] != "American Samoa",
+    ]
 
     # Copy state values into column called "State" instead of "state".
     df[STATE_FIELD] = df[STATE_SOURCE_FIELD]
@@ -563,20 +565,20 @@ def transform_cdc_ili_data(df):
     return df
 
 
-def transform_hospital_bed_data(bed_df):
+def transform_cdc_data(cdc_df):
     # Calculate 3A: ICU and in-patient beds must have < 80% utilization for 7 consecutive days
 
-    icu_bed_subset_frame = bed_df.filter(regex="{}.*".format(BASE_ICU_BEDS_FIELD))
-    inpatient_bed_subset_frame = bed_df.filter(
+    icu_bed_subset_frame = cdc_df.filter(regex="{}.*".format(BASE_ICU_BEDS_FIELD))
+    inpatient_bed_subset_frame = cdc_df.filter(
         regex="{}.*".format(BASE_INPATIENT_BEDS_FIELD)
     )
-    bed_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] = inpatient_bed_subset_frame.max(axis=1)
-    bed_df[MAX_ICU_BED_OCCUPATION_7_DAYS] = icu_bed_subset_frame.max(axis=1)
-    bed_df[CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD] = (
-        bed_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD
-    ) & (bed_df[MAX_ICU_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD)
-    bed_df = bed_df.reset_index(drop=False)
-    return bed_df
+    cdc_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] = inpatient_bed_subset_frame.max(axis=1)
+    cdc_df[MAX_ICU_BED_OCCUPATION_7_DAYS] = icu_bed_subset_frame.max(axis=1)
+    cdc_df[CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD] = (
+        cdc_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD
+    ) & (cdc_df[MAX_ICU_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD)
+    cdc_df = cdc_df.reset_index(drop=False)
+    return cdc_df
 
 
 def indication_of_rebound(series_):
