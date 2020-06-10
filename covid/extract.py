@@ -59,7 +59,7 @@ def power_bi_extractor(response):
 
 
 def extract_cdc_data_date():
-    # State Representative Estimates for Percentage of Inpatient Beds Occupied (All Patients)
+    # Get data date as seen on the website
     response = requests.post(
         cgc.URL,
         headers={**cgc.BASE_HEADERS, **cgc.DATA_DATE_HEADERS},
