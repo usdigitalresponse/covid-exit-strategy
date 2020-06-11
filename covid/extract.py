@@ -49,7 +49,7 @@ def get_state_abbreviations_to_names():
 
 def power_bi_extractor(response):
     data = json.loads(response.text)
-    timestamp = data['results'][0]['result']['data']['timestamp']
+    timestamp = extract_cdc_data_date()
     value_list = data['results'][0]['result']['data']['dsr']['DS'][0]['PH'][1]['DM1']
     for vl in value_list:
         yield vl['C'] + [timestamp]
@@ -57,13 +57,24 @@ def power_bi_extractor(response):
 
 # CDC data source: https://www.cdc.gov/nhsn/covid19/report-patient-impact.html
 
+
+def extract_cdc_data_date():
+    # Get data date as seen on the website
+    response = requests.post(
+        cgc.URL,
+        headers={**cgc.BASE_HEADERS, **cgc.DATA_DATE_HEADERS},
+        data=open("./covid/extract_config/data_date.json"))
+
+    data = json.loads(response.text)
+    return data['results'][0]['result']['data']['dsr']['DS'][0]['PH'][0]['DM0'][0]['M0']
+
+
 def extract_cdc_inpatient_beds():
     # State Representative Estimates for Percentage of Inpatient Beds Occupied (All Patients)
     response = requests.post(
         cgc.URL,
         headers={**cgc.BASE_HEADERS, **cgc.INPATIENT_BED_HEADERS},
         data=open("./covid/extract_config/inpatient_bed_query.json"))
-    # breakpoint()
 
     df = pd.DataFrame(
         power_bi_extractor(response),

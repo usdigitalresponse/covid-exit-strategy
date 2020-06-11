@@ -28,3 +28,9 @@ INPATIENT_BED_HEADERS = {
     'X-PowerBI-ResourceKey': '98a398f7-3501-49b4-a286-547699f224ae',
     'ActivityId': '323ea734-e54f-baa4-d223-b8311caef3db',
 }
+
+DATA_DATE_HEADERS = {
+'RequestId': 'cf502789-b71f-6c3d-eb1c-c1eef2f67e11',
+'X-PowerBI-ResourceKey': 'b9620858-a58e-4292-8787-b40d9addd481',
+'ActivityId': '30b8c6a2-88ce-0993-489b-332cbc082ed6'
+}
