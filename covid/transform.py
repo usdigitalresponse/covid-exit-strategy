@@ -566,19 +566,37 @@ def transform_cdc_ili_data(df):
 
 
 def transform_cdc_data(cdc_df):
-    # Calculate 3A: ICU and in-patient beds must have < 80% utilization for 7 consecutive days
+    # Convert data from str to float
+    cdc_df["inpatient_bed_percent_occupied"] = cdc_df[
+        "inpatient_bed_percent_occupied"
+    ].astype(float)
+    cdc_df["icu_percent_occupied"] = cdc_df["icu_percent_occupied"].astype(float)
 
-    icu_bed_subset_frame = cdc_df.filter(regex="{}.*".format(BASE_ICU_BEDS_FIELD))
-    inpatient_bed_subset_frame = cdc_df.filter(
-        regex="{}.*".format(BASE_INPATIENT_BEDS_FIELD)
-    )
-    cdc_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] = inpatient_bed_subset_frame.max(axis=1)
-    cdc_df[MAX_ICU_BED_OCCUPATION_7_DAYS] = icu_bed_subset_frame.max(axis=1)
-    cdc_df[CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD] = (
-        cdc_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD
-    ) & (cdc_df[MAX_ICU_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD)
-    cdc_df = cdc_df.reset_index(drop=False)
-    return cdc_df
+    # Date as index
+    cdc_df[DATE_SOURCE_FIELD] = pd.to_datetime(cdc_df["timestamp"])
+    cdc_df = cdc_df.set_index(DATE_SOURCE_FIELD, append=True)
+    cdc_df = cdc_df.sort_index()  # ascending date and state
+    cdc_df.index.names = [STATE_FIELD, DATE_SOURCE_FIELD]
+
+    # Calculate 3A: ICU and in-patient beds must have < 80% utilization for 7 consecutive days
+    # Hack because GROUPBY ROLLING doesn't work for datetimeindex. Thanks Pandas.
+    states = cdc_df.index.get_level_values(STATE_FIELD).unique()
+    state_dfs = []
+    for state in states:
+        state_df = cdc_df.xs(state, axis=0, level=STATE_FIELD)
+        state_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] = (
+            state_df["inpatient_bed_percent_occupied"].rolling("7D").max()
+        )
+        state_df[MAX_ICU_BED_OCCUPATION_7_DAYS] = (
+            state_df["icu_percent_occupied"].rolling("7D").max()
+        )
+        state_df[CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD] = (
+            state_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD
+        ) & (state_df[MAX_ICU_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD)
+        state_dfs.append(state_df)
+    combined_df = pd.concat(state_dfs, keys=states, names=[STATE_FIELD])
+    combined_df = combined_df.reset_index(drop=False)
+    return combined_df
 
 
 def indication_of_rebound(series_):
