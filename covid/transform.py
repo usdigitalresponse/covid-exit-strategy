@@ -535,13 +535,18 @@ def transform_cdc_ili_data(df):
     assert set(df["REGION TYPE"].unique()) == {"States"}
 
     # Create a new column that combines the `YEAR` and `WEEK` column.
-    # Note: the `-1` sets these timestamp at Monday of each week.
-    df["_WEEK_TIMESTAMP"] = pd.to_datetime(
-        df["YEAR"] + "-W" + df["WEEK"] + "-1", format="%Y-W%W-%w"
+    # Note: The `-6` sets the date field to the start of the weekend (Saturday) for each week. We also subtract 1 week
+    #   to start the weeks at zero and ensure that they align with `https://www.epochconverter.com/weeks/2020`.
+    df[DATE_SOURCE_FIELD] = pd.to_datetime(
+        df["YEAR"] + "-" + (df["WEEK"].astype(int) - 1).astype(str) + "-6",
+        format="%Y-%U-%w",
     )
 
+    # Rename the region field to match the `state` field present in other data frames.
+    df = df.rename(columns={"REGION": STATE_FIELD})
+
     # Create a new multi-index containing the state name (`REGION`) and timestamp of the week.
-    df = df.set_index(keys=["REGION", "_WEEK_TIMESTAMP"])
+    df = df.set_index(keys=[STATE_FIELD, DATE_SOURCE_FIELD])
 
     return df
 
