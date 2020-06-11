@@ -32,7 +32,7 @@ def extract_transform_and_load_covid_data():
     cdc_df = extract_cdc_data()
     # covidtracking_df = extract_covidtracking_historical_data()
 
-    transform_cdc_data(cdc_df)
+    transformed_cdc_df = transform_cdc_data(cdc_df)
     # transformed_covidtracking_df = transform_covidtracking_data(df=covidtracking_df)
 
     client, credentials = get_sheets_client(
@@ -41,7 +41,9 @@ def extract_transform_and_load_covid_data():
 
     # Upload category 3A data.
     post_dataframe_to_google_sheets(
-        df=transformed_bed_df,
+        df=calculate_state_summary(
+            transformed_df=transformed_cdc_df, columns=STATE_SUMMARY_COLUMNS
+        ),
         workbook_key=CDC_CRITERIA_3_GOOGLE_WORKBOOK_KEY,
         tab_name=STATE_SUMMARY_TAB_NAME,
         credentials=credentials,
