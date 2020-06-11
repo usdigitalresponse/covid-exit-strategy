@@ -164,5 +164,5 @@ def calculate_state_summary(transformed_df, columns):
     state_summary_df = state_summary_df.loc[
         state_summary_df[DATE_SOURCE_FIELD] == current_date, columns
     ]
-
+    print("weeee")
     return state_summary_df

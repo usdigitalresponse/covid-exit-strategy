@@ -179,6 +179,14 @@ CRITERIA_2_SUMMARY_COLUMNS = [
     LAST_UPDATED_FIELD,
 ]
 
+CRITERIA_3_SUMMARY_COLUMNS = [
+    STATE_FIELD,
+    MAX_ICU_BED_OCCUPATION_7_DAYS,
+    MAX_INPATIENT_BED_OCCUPATION_7_DAYS,
+    CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD,
+    CDC_CRITERIA_3_COMBINED_FIELD,
+]
+
 
 def transform_covidtracking_data(df):
 
@@ -585,14 +593,21 @@ def transform_cdc_data(cdc_df):
     for state in states:
         state_df = cdc_df.xs(state, axis=0, level=STATE_FIELD)
         state_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] = (
-            state_df["inpatient_bed_percent_occupied"].rolling("7D").max()
+            state_df["inpatient_bed_percent_occupied"]
+            .rolling(f"{CRITERIA_3A_NUM_CONSECUTIVE_DAYS}D")
+            .max()
         )
         state_df[MAX_ICU_BED_OCCUPATION_7_DAYS] = (
-            state_df["icu_percent_occupied"].rolling("7D").max()
+            state_df["icu_percent_occupied"]
+            .rolling(f"{CRITERIA_3A_NUM_CONSECUTIVE_DAYS}D")
+            .max()
         )
         state_df[CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD] = (
             state_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD
         ) & (state_df[MAX_ICU_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD)
+        state_df[CDC_CRITERIA_3_COMBINED_FIELD] = state_df[
+            CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD
+        ]
         state_dfs.append(state_df)
     combined_df = pd.concat(state_dfs, keys=states, names=[STATE_FIELD])
     combined_df = combined_df.reset_index(drop=False)

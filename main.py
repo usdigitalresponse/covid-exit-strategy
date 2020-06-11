@@ -8,6 +8,7 @@ from covid.load import get_sheets_client
 from covid.load import post_dataframe_to_google_sheets
 from covid.transform import CRITERIA_1_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_2_SUMMARY_COLUMNS
+from covid.transform import CRITERIA_3_SUMMARY_COLUMNS
 from covid.transform import STATE_SUMMARY_COLUMNS
 from covid.transform import transform_cdc_data
 from covid.transform_utils import calculate_state_summary
@@ -42,10 +43,17 @@ def extract_transform_and_load_covid_data():
     # Upload category 3A data.
     post_dataframe_to_google_sheets(
         df=calculate_state_summary(
-            transformed_df=transformed_cdc_df, columns=STATE_SUMMARY_COLUMNS
+            transformed_df=transformed_cdc_df, columns=CRITERIA_3_SUMMARY_COLUMNS
         ),
         workbook_key=CDC_CRITERIA_3_GOOGLE_WORKBOOK_KEY,
         tab_name=STATE_SUMMARY_TAB_NAME,
+        credentials=credentials,
+    )
+
+    post_dataframe_to_google_sheets(
+        df=transformed_cdc_df,
+        workbook_key=CDC_CRITERIA_3_GOOGLE_WORKBOOK_KEY,
+        tab_name="Historical Data",
         credentials=credentials,
     )
 
