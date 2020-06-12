@@ -5,7 +5,6 @@ import pandas as pd
 import requests
 
 import covid.extract_config.cdc_govcloud as cgc
-
 from covid.extract_utils import unzip_string
 
 
@@ -58,7 +57,6 @@ def get_state_abbreviations_to_names():
     return abbreviations
 
 
-<<<<<<< HEAD
 def power_bi_extractor(response):
     data = json.loads(response.text)
     timestamp = extract_cdc_data_date()
