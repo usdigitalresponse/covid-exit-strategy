@@ -12,7 +12,6 @@ from covid.transform import transform_covidtracking_data
 from covid.transform_utils import calculate_state_summary
 
 # Define the names of the tabs to upload to.
-
 CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY = "1s534JoVjsetLDUxzkww3yQSnRj9H-8QLMKPUrq7RAuc"
 FOR_WEBSITE_TAB_NAME = "For Website"
 ALL_STATE_DATA_TAB_NAME = "All State Data"

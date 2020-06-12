@@ -1,3 +1,5 @@
+# Note: CFFI allows us to run R code even if R isn't installed on the system.
+cffi==1.14.0
 df2gspread==1.0.4
 gspread==3.6.0
 numpy==1.18.4
