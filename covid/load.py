@@ -14,9 +14,7 @@ def post_dataframe_to_google_sheets(
     if nan_replacement_value is not None:
         df = df.fillna(value=nan_replacement_value)
 
-    logger.info(
-        f"Beginning to upload data to workbook {workbook_key} and tab {tab_name}..."
-    )
+    print(f"Beginning to upload data to workbook {workbook_key} and tab {tab_name}...")
     df2gspread.upload(
         df=df,
         gfile=workbook_key,
@@ -26,7 +24,7 @@ def post_dataframe_to_google_sheets(
         row_names=False,
         col_names=True,
     )
-    logger.info("Finished uploading data.")
+    print("Finished uploading data.")
 
 
 # TODO(lbrown): this was created when I was using the Sheets API, at this point we may only need the credentials.

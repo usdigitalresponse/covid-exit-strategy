@@ -142,7 +142,7 @@ def generate_lags(df, column, num_lags=121):
         date_to_lookup = today
 
         for lag in range(num_lags):
-            logger.info(f"For field {column}, processing {state} for lag {lag}.")
+            print(f"For field {column}, processing {state} for lag {lag}.")
             # Lookup the historical entry.
             value = df.loc[
                 (df[STATE_SOURCE_FIELD] == state)

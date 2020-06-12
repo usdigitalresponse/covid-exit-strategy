@@ -15,13 +15,16 @@ def install_package(package):
     Returns:
 
     """
-    logger.debug(f"Installing package {package}...")
+    print(f"Installing package {package}...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-    logger.debug(f"Install of package {package} completed.")
+    print(f"Install of package {package} completed.")
 
 
 def install_rpy2():
+    print("Trying to install r-base...")
     subprocess.run(["apt", "install", "r-base"])
+    # subprocess.run('conda install -c conda-forge r-base', shell=True)
+    print("Finished installing r-base.")
 
     os.environ["RPY2_CFFI_MODE"] = "ABI"
     install_package("rpy2==3.3.2")

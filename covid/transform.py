@@ -191,7 +191,7 @@ def transform_covidtracking_data(df):
     state_population_data = extract_state_population_data()
 
     for state in states:
-        logger.info(f"Processing state {state}...")
+        print(f"Processing state {state}...")
 
         ###### Calculate criteria category 1. ######
         # Calculate new cases (raw).
