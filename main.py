@@ -36,8 +36,6 @@ logger = logging.getLogger()
 
 
 def extract_transform_and_load_covid_data():
-    install_rpy2()
-
     df = extract_covidtracking_historical_data()
 
     transformed_df = transform_covidtracking_data(df=df)
@@ -93,5 +91,17 @@ def extract_transform_and_load_covid_data():
     )
 
 
-if __name__ == "__main__":
+def main(request):
+    """Method to run in Google Cloud Platform Cloud Functions.
+
+    Args:
+         request (flask.Request, optional): Unused. Necessary for cloud functions.
+    """
+    install_rpy2()
     extract_transform_and_load_covid_data()
+
+    return "Request succeeded."
+
+
+if __name__ == "__main__":
+    main()
