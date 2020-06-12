@@ -2,7 +2,9 @@
 import os
 
 from covid.constants import PATH_TO_SERVICE_ACCOUNT_KEY
-from covid.extract import extract_cdc_data
+from covid.extract import extract_covidtracking_historical_data
+from covid.extract import extract_current_cdc_data
+from covid.extract import extract_historical_cdc_data
 from covid.extract import STATE_SOURCE_FIELD
 from covid.load import get_sheets_client
 from covid.load import post_dataframe_to_google_sheets
@@ -11,6 +13,7 @@ from covid.transform import CRITERIA_2_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_3_SUMMARY_COLUMNS
 from covid.transform import STATE_SUMMARY_COLUMNS
 from covid.transform import transform_cdc_data
+from covid.transform import transform_covidtracking_data
 from covid.transform_utils import calculate_state_summary
 
 # Define the names of the tabs to upload to.
@@ -30,15 +33,16 @@ CDC_CRITERIA_3_GOOGLE_WORKBOOK_KEY = "1-BSd5eFbNsypygMkhuGX1OWoUsF2u4chpsu6aC4cg
 
 
 def extract_transform_and_load_covid_data():
-    cdc_df = extract_cdc_data()
-    # covidtracking_df = extract_covidtracking_historical_data()
-
-    transformed_cdc_df = transform_cdc_data(cdc_df)
-    # transformed_covidtracking_df = transform_covidtracking_data(df=covidtracking_df)
-
     client, credentials = get_sheets_client(
         credential_file_path=os.path.abspath(PATH_TO_SERVICE_ACCOUNT_KEY)
     )
+
+    cdc_current_df = extract_current_cdc_data()
+    cdc_historical_df = extract_historical_cdc_data(credentials)
+    covidtracking_df = extract_covidtracking_historical_data()
+
+    transformed_cdc_df = transform_cdc_data(cdc_current_df, cdc_historical_df)
+    transformed_covidtracking_df = transform_covidtracking_data(df=covidtracking_df)
 
     # Upload category 3A data.
     post_dataframe_to_google_sheets(

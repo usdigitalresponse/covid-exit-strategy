@@ -573,18 +573,22 @@ def transform_cdc_ili_data(df):
     return df
 
 
-def transform_cdc_data(cdc_df):
+def transform_cdc_data(cdc_current_df, cdc_historical_df):
+    # Add date to index
+    cdc_df = pd.concat([cdc_current_df, cdc_historical_df], axis=0)
+    cdc_df[DATE_SOURCE_FIELD] = pd.to_datetime(cdc_df[DATE_SOURCE_FIELD])
+    cdc_df = cdc_df.set_index(DATE_SOURCE_FIELD, append=True)
+    cdc_df = cdc_df.sort_index()  # ascending date and state
+    cdc_df.index.names = [STATE_FIELD, DATE_SOURCE_FIELD]
+
+    # Drop duplicate dates
+    cdc_df = cdc_df.loc[~cdc_df.index.duplicated(), :]
+
     # Convert data from str to float
     cdc_df["inpatient_bed_percent_occupied"] = cdc_df[
         "inpatient_bed_percent_occupied"
     ].astype(float)
     cdc_df["icu_percent_occupied"] = cdc_df["icu_percent_occupied"].astype(float)
-
-    # Date as index
-    cdc_df[DATE_SOURCE_FIELD] = pd.to_datetime(cdc_df["timestamp"])
-    cdc_df = cdc_df.set_index(DATE_SOURCE_FIELD, append=True)
-    cdc_df = cdc_df.sort_index()  # ascending date and state
-    cdc_df.index.names = [STATE_FIELD, DATE_SOURCE_FIELD]
 
     # Calculate 3A: ICU and in-patient beds must have < 80% utilization for 7 consecutive days
     # Hack because GROUPBY ROLLING doesn't work for datetimeindex. Thanks Pandas.
