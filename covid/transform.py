@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 import pandas as pd
 
@@ -15,6 +16,8 @@ from covid.transform_utils import generate_lags
 from covid.transform_utils import get_consecutive_positive_or_negative_values
 from covid.transform_utils import get_max_run_in_window
 
+
+logger = logging.getLogger(__name__)
 
 # Define output field names.
 # Criteria Category 1 Fields.
@@ -188,7 +191,7 @@ def transform_covidtracking_data(df):
     state_population_data = extract_state_population_data()
 
     for state in states:
-        print(f"Processing state {state}...")
+        logger.info(f"Processing state {state}...")
 
         ###### Calculate criteria category 1. ######
         # Calculate new cases (raw).

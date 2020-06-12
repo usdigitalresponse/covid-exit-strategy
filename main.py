@@ -1,4 +1,5 @@
 # Define source field names.
+import logging
 import os
 
 from covid.extract import extract_covidtracking_historical_data
@@ -24,6 +25,13 @@ CDC_CRITERIA_2_GOOGLE_WORKBOOK_KEY = "1xdePOZkXXv49_15YTloLr7D72eQhY9R-ZEhoMr-4U
 # Note: if you'd like to run the full pipeline, you'll need to generate a service account keyfile for an account
 # that has been given write access to the Google Sheet.
 PATH_TO_SERVICE_ACCOUNT_KEY = "service-account-key.json"
+
+
+# Configure global logging level.
+logging.basicConfig(level=logging.DEBUG)
+
+# Configure root logging.
+logger = logging.getLogger()
 
 
 def extract_transform_and_load_covid_data():

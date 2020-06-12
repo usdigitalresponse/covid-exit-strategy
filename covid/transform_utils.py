@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 import numpy as np
 import pandas as pd
@@ -7,6 +8,9 @@ from scipy import interpolate as interpolate
 
 from covid.extract import DATE_SOURCE_FIELD
 from covid.extract import STATE_SOURCE_FIELD
+
+
+logger = logging.getLogger(__name__)
 
 
 def fit_and_predict_cubic_spline(series_):
@@ -136,7 +140,7 @@ def generate_lags(df, column, num_lags=121):
         date_to_lookup = today
 
         for lag in range(num_lags):
-            print(f"For field {column}, processing {state} for lag {lag}.")
+            logger.info(f"For field {column}, processing {state} for lag {lag}.")
             # Lookup the historical entry.
             value = df.loc[
                 (df[STATE_SOURCE_FIELD] == state)
