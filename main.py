@@ -4,6 +4,7 @@ import os
 
 from covid.extract import extract_covidtracking_historical_data
 from covid.extract import STATE_SOURCE_FIELD
+from covid.install_utils import install_rpy2
 from covid.load import get_sheets_client
 from covid.load import post_dataframe_to_google_sheets
 from covid.transform import CRITERIA_1_SUMMARY_COLUMNS
@@ -35,6 +36,8 @@ logger = logging.getLogger()
 
 
 def extract_transform_and_load_covid_data():
+    install_rpy2()
+
     df = extract_covidtracking_historical_data()
 
     transformed_df = transform_covidtracking_data(df=df)

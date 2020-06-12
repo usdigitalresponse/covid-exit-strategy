@@ -3,7 +3,6 @@ import logging
 
 import numpy as np
 import pandas as pd
-from rpy2 import robjects as robjects
 from scipy import interpolate as interpolate
 
 from covid.extract import DATE_SOURCE_FIELD
@@ -39,6 +38,9 @@ def fit_and_predict_cubic_spline(series_):
 def fit_and_predict_cubic_spline_in_r(
     series_, smoothing_parameter=None, replace_nan=True
 ):
+    # Use local imports so we can have special handling for installing rpy2.
+    from rpy2 import robjects as robjects
+
     if not smoothing_parameter:
         # Import `NULL` from R.
         smoothing_parameter = robjects.r["as.null"]()
