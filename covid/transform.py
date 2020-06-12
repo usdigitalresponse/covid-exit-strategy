@@ -524,6 +524,33 @@ def transform_covidtracking_data(df):
     return df
 
 
+def transform_cdc_ili_data(df):
+    # Use the first row of the index as the index names.
+    df.index.names = df.index[0]
+
+    # Drop the row containing the labels, and set a new multi-index using the region, year, and week.
+    df = df.iloc[1:].reset_index()
+
+    # Validate that the only region type is states to sanity check data.
+    assert set(df["REGION TYPE"].unique()) == {"States"}
+
+    # Create a new column that combines the `YEAR` and `WEEK` column.
+    # Note: The `-6` sets the date field to the start of the weekend (Saturday) for each week. We also subtract 1 week
+    #   to start the weeks at zero and ensure that they align with `https://www.epochconverter.com/weeks/2020`.
+    df[DATE_SOURCE_FIELD] = pd.to_datetime(
+        df["YEAR"] + "-" + (df["WEEK"].astype(int) - 1).astype(str) + "-6",
+        format="%Y-%U-%w",
+    )
+
+    # Rename the region field to match the `state` field present in other data frames.
+    df = df.rename(columns={"REGION": STATE_FIELD})
+
+    # Create a new multi-index containing the state name (`REGION`) and timestamp of the week.
+    df = df.set_index(keys=[STATE_FIELD, DATE_SOURCE_FIELD])
+
+    return df
+
+
 def indication_of_rebound(series_):
     indicator = None
     if series_[CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE] is True:
