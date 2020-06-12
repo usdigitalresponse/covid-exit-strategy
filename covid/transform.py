@@ -83,6 +83,18 @@ CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD = "CDC Criteria 2C"
 CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD = "CDC Criteria 2D"
 CDC_CRITERIA_2_COMBINED_FIELD = "CDC Criteria 2 (Combined)"
 
+
+# Criteria Category 3 Fields.
+MAX_ICU_BED_OCCUPATION_7_DAYS = "max_icu_bed_occupation_7_days"
+MAX_INPATIENT_BED_OCCUPATION_7_DAYS = "max_inpatient_bed_occupation_7_days"
+BASE_ICU_BEDS_FIELD = "% of ICU Beds Occupied"
+BASE_INPATIENT_BEDS_FIELD = "% of Inpatient Beds Occupied"
+CRITERIA_3A_NUM_CONSECUTIVE_DAYS = 7
+CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD = "CDC Criteria 3A"
+CDC_CRITERIA_3_COMBINED_FIELD = "CDC Criteria 3 (Combined)"
+PHASE_1_OCCUPATION_THRESHOLD = 0.80  # Beds must be less than 80% full
+
+
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
 CDC_CRITERIA_ALL_COMBINED_OR_FIELD = "cdc_criteria_all_combined_using_or"
@@ -165,6 +177,14 @@ CRITERIA_2_SUMMARY_COLUMNS = [
     CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
     LAST_UPDATED_FIELD,
+]
+
+CRITERIA_3_SUMMARY_COLUMNS = [
+    STATE_FIELD,
+    MAX_ICU_BED_OCCUPATION_7_DAYS,
+    MAX_INPATIENT_BED_OCCUPATION_7_DAYS,
+    CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD,
+    CDC_CRITERIA_3_COMBINED_FIELD,
 ]
 
 
@@ -516,7 +536,9 @@ def transform_covidtracking_data(df):
         )
 
     # Drop American Samoa because it's not reporting data
-    df = df.loc[df[STATE_SOURCE_FIELD] != "American Samoa",]
+    df = df.loc[
+        df[STATE_SOURCE_FIELD] != "American Samoa",
+    ]
 
     # Copy state values into column called "State" instead of "state".
     df[STATE_FIELD] = df[STATE_SOURCE_FIELD]
@@ -549,6 +571,51 @@ def transform_cdc_ili_data(df):
     df = df.set_index(keys=[STATE_FIELD, DATE_SOURCE_FIELD])
 
     return df
+
+
+def transform_cdc_data(cdc_current_df, cdc_historical_df):
+    # Add date to index
+    cdc_df = pd.concat([cdc_current_df, cdc_historical_df], axis=0)
+    cdc_df[DATE_SOURCE_FIELD] = pd.to_datetime(cdc_df[DATE_SOURCE_FIELD])
+    cdc_df = cdc_df.set_index(DATE_SOURCE_FIELD, append=True)
+    cdc_df = cdc_df.sort_index()  # ascending date and state
+    cdc_df.index.names = [STATE_FIELD, DATE_SOURCE_FIELD]
+
+    # Drop duplicate dates
+    cdc_df = cdc_df.loc[~cdc_df.index.duplicated(), :]
+
+    # Convert data from str to float
+    cdc_df["inpatient_bed_percent_occupied"] = cdc_df[
+        "inpatient_bed_percent_occupied"
+    ].astype(float)
+    cdc_df["icu_percent_occupied"] = cdc_df["icu_percent_occupied"].astype(float)
+
+    # Calculate 3A: ICU and in-patient beds must have < 80% utilization for 7 consecutive days
+    # Hack because GROUPBY ROLLING doesn't work for datetimeindex. Thanks Pandas.
+    states = cdc_df.index.get_level_values(STATE_FIELD).unique()
+    state_dfs = []
+    for state in states:
+        state_df = cdc_df.xs(state, axis=0, level=STATE_FIELD)
+        state_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] = (
+            state_df["inpatient_bed_percent_occupied"]
+            .rolling(f"{CRITERIA_3A_NUM_CONSECUTIVE_DAYS}D")
+            .max()
+        )
+        state_df[MAX_ICU_BED_OCCUPATION_7_DAYS] = (
+            state_df["icu_percent_occupied"]
+            .rolling(f"{CRITERIA_3A_NUM_CONSECUTIVE_DAYS}D")
+            .max()
+        )
+        state_df[CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD] = (
+            state_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD
+        ) & (state_df[MAX_ICU_BED_OCCUPATION_7_DAYS] < PHASE_1_OCCUPATION_THRESHOLD)
+        state_df[CDC_CRITERIA_3_COMBINED_FIELD] = state_df[
+            CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD
+        ]
+        state_dfs.append(state_df)
+    combined_df = pd.concat(state_dfs, keys=states, names=[STATE_FIELD])
+    combined_df = combined_df.reset_index(drop=False)
+    return combined_df
 
 
 def indication_of_rebound(series_):

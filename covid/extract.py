@@ -3,6 +3,7 @@ from io import BytesIO
 
 import pandas as pd
 import requests
+from df2gspread import gspread2df
 
 import covid.extract_config.cdc_govcloud as cgc
 from covid.extract_utils import unzip_string
@@ -17,10 +18,15 @@ WHO_NREVSS_CLINICAL_LABS_CSV = "WHO_NREVSS_Clinical_Labs.csv"
 
 DATE_SOURCE_FIELD = "date"
 STATE_SOURCE_FIELD = "state"
+STATE_FIELD = "State"
 TOTAL_CASES_SOURCE_FIELD = "positive"
 NEW_CASES_NEGATIVE_SOURCE_FIELD = "negativeIncrease"
 NEW_CASES_POSITIVE_SOURCE_FIELD = "positiveIncrease"
 LAST_UPDATED_SOURCE_FIELD = "dateModified"
+
+# For bed utilization data
+CATEGORY_3_DATA_GOOGLE_SHEET_KEY = "1-BSd5eFbNsypygMkhuGX1OWoUsF2u4chpsu6aC4cgVo"
+CATEGORY_3_HISTORICAL_DATA_TAB = "Historical Data"
 
 
 def extract_covidtracking_current_data():
@@ -91,14 +97,14 @@ def extract_cdc_inpatient_beds():
     df = pd.DataFrame(
         power_bi_extractor(response),
         columns=[
-            "State",
+            STATE_FIELD,
             "inpatient_bed_percent_occupied",
             "inpatient_beds_occupied",
-            "timestamp",
+            DATE_SOURCE_FIELD,
         ],
     )
 
-    df = df.set_index("State")
+    df = df.set_index(STATE_FIELD)
 
     return df
 
@@ -113,10 +119,15 @@ def extract_cdc_icu_beds():
 
     df = pd.DataFrame(
         power_bi_extractor(response),
-        columns=["State", "icu_percent_occupied", "icu_beds_occupied", "timestamp"],
+        columns=[
+            STATE_FIELD,
+            "icu_percent_occupied",
+            "icu_beds_occupied",
+            DATE_SOURCE_FIELD,
+        ],
     )
 
-    df = df.set_index("State")
+    df = df.set_index(STATE_FIELD)
 
     return df
 
@@ -131,14 +142,14 @@ def extract_cdc_facilities_reporting():
     df = pd.DataFrame(
         power_bi_extractor(response),
         columns=[
-            "State",
+            STATE_FIELD,
             "facilities_percent_reporting",
             "facilities_reporting",
-            "timestamp",
+            DATE_SOURCE_FIELD,
         ],
     )
 
-    df = df.set_index("State")
+    df = df.set_index(STATE_FIELD)
 
     return df
 
@@ -162,5 +173,26 @@ def extract_cdc_ili_data():
     filenames_to_contents_map = unzip_string(response.content)
 
     df = pd.read_csv(BytesIO(filenames_to_contents_map[ILI_NET_CSV]))
+    df = df.set_index("State")
 
     return df
+
+
+def extract_current_cdc_data():
+    inpatient_bed_df = extract_cdc_inpatient_beds()
+    icu_bed_df = extract_cdc_icu_beds()
+    hospitals_reporting_df = extract_cdc_facilities_reporting()
+    cdc_df = pd.concat([inpatient_bed_df, icu_bed_df, hospitals_reporting_df], axis=1)
+    cdc_df = cdc_df.loc[:, ~cdc_df.columns.duplicated()]
+    return cdc_df
+
+
+def extract_historical_cdc_data(credentials):
+    cdc_historical_df = gspread2df.download(
+        CATEGORY_3_DATA_GOOGLE_SHEET_KEY,
+        CATEGORY_3_HISTORICAL_DATA_TAB,
+        credentials=credentials,
+        col_names=True,
+    )
+    cdc_historical_df = cdc_historical_df.set_index(STATE_FIELD)
+    return cdc_historical_df
