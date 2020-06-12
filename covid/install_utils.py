@@ -22,7 +22,10 @@ def install_package(package):
 
 def install_rpy2():
     print("Trying to install r-base...")
-    subprocess.run(["apt", "install", "r-base"])
+    try:
+        subprocess.run(["apt", "install", "r-base"])
+    except Exception as error:
+        print(f"Encountered error of {error}")
     # subprocess.run('conda install -c conda-forge r-base', shell=True)
     print("Finished installing r-base.")
 
