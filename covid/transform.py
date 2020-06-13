@@ -188,21 +188,27 @@ CRITERIA_3_SUMMARY_COLUMNS = [
 ]
 
 
-def transform_covidtracking_data(df):
+def transform_covidtracking_data(covidtracking_df):
 
     # Replace abbreviations with full names.
     state_abbreviations_to_names = get_state_abbreviations_to_names()
-    df = df.replace({STATE_SOURCE_FIELD: state_abbreviations_to_names})
-    states = df[STATE_SOURCE_FIELD].unique()
+    covidtracking_df = covidtracking_df.replace(
+        {STATE_SOURCE_FIELD: state_abbreviations_to_names}
+    )
+    states = covidtracking_df[STATE_SOURCE_FIELD].unique()
 
     # Make the date column explicitly a date
-    df[DATE_SOURCE_FIELD] = pd.to_datetime(df[DATE_SOURCE_FIELD])
+    covidtracking_df[DATE_SOURCE_FIELD] = pd.to_datetime(
+        covidtracking_df[DATE_SOURCE_FIELD]
+    )
 
     # Use a multi-index for state and date.
-    df.set_index(keys=[STATE_SOURCE_FIELD, DATE_SOURCE_FIELD], inplace=True)
+    covidtracking_df.set_index(
+        keys=[STATE_SOURCE_FIELD, DATE_SOURCE_FIELD], inplace=True
+    )
 
     # Sort by the index: state ascending, date ascending.
-    df = df.sort_index()
+    covidtracking_df = covidtracking_df.sort_index()
 
     # Load state population data.
     state_population_data = extract_state_population_data()
@@ -212,34 +218,36 @@ def transform_covidtracking_data(df):
 
         ###### Calculate criteria category 1. ######
         # Calculate new cases (raw).
-        df.loc[(state,), NEW_CASES_FIELD] = (
-            df.loc[(state,), TOTAL_CASES_SOURCE_FIELD].diff(periods=1).values
+        covidtracking_df.loc[(state,), NEW_CASES_FIELD] = (
+            covidtracking_df.loc[(state,), TOTAL_CASES_SOURCE_FIELD]
+            .diff(periods=1)
+            .values
         )
 
         # Calculate new cases (raw diff).
-        df.loc[(state,), NEW_CASES_DIFF_FIELD] = (
-            df.loc[(state,), NEW_CASES_FIELD].diff(periods=1).values
+        covidtracking_df.loc[(state,), NEW_CASES_DIFF_FIELD] = (
+            covidtracking_df.loc[(state,), NEW_CASES_FIELD].diff(periods=1).values
         )
 
         # Calculate 3-day rolling average of total cases.
-        df.loc[(state,), TOTAL_CASES_3_DAY_AVERAGE_FIELD] = (
-            df.loc[(state,), TOTAL_CASES_SOURCE_FIELD]
+        covidtracking_df.loc[(state,), TOTAL_CASES_3_DAY_AVERAGE_FIELD] = (
+            covidtracking_df.loc[(state,), TOTAL_CASES_SOURCE_FIELD]
             .rolling(window=3, min_periods=1, center=False)
             .mean()
             .values
         )
 
         # Calculate the cubic spline on the 3 day average of total cases.
-        df.loc[
+        covidtracking_df.loc[
             (state,), TOTAL_CASES_3_DAY_AVERAGE_CUBIC_SPLINE_FIELD
         ] = fit_and_predict_cubic_spline_in_r(
-            series_=df.loc[(state,), TOTAL_CASES_3_DAY_AVERAGE_FIELD],
+            series_=covidtracking_df.loc[(state,), TOTAL_CASES_3_DAY_AVERAGE_FIELD],
             smoothing_parameter=0.5,
         ).values
 
         # Calculate 3-day rolling average of new cases.
-        df.loc[(state,), NEW_CASES_3_DAY_AVERAGE_FIELD] = (
-            df.loc[(state,), NEW_CASES_FIELD]
+        covidtracking_df.loc[(state,), NEW_CASES_3_DAY_AVERAGE_FIELD] = (
+            covidtracking_df.loc[(state,), NEW_CASES_FIELD]
             .rolling(window=3, min_periods=1, center=False)
             .mean()
             # Replace NA new cases with `0` to fit the spline.
@@ -248,101 +256,115 @@ def transform_covidtracking_data(df):
         )
 
         # Calculate the cubic spline on the 3 day average of total cases.
-        df.loc[(state,), NEW_CASES_3DCS_FIELD] = fit_and_predict_cubic_spline_in_r(
-            series_=df.loc[(state,), NEW_CASES_3_DAY_AVERAGE_FIELD],
+        covidtracking_df.loc[
+            (state,), NEW_CASES_3DCS_FIELD
+        ] = fit_and_predict_cubic_spline_in_r(
+            series_=covidtracking_df.loc[(state,), NEW_CASES_3_DAY_AVERAGE_FIELD],
             smoothing_parameter=0.5,
         ).values
 
         # Calculate 3DCS new cases diff.
-        df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD] = (
-            df.loc[(state,), NEW_CASES_3DCS_FIELD].diff(periods=1).values
+        covidtracking_df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD] = (
+            covidtracking_df.loc[(state,), NEW_CASES_3DCS_FIELD].diff(periods=1).values
         )
 
         # Calculate consecutive increases or decreases.
-        df.loc[
+        covidtracking_df.loc[
             (state,), CONSECUTIVE_INCREASE_NEW_CASES_3DCS_FIELD
         ] = get_consecutive_positive_or_negative_values(
-            series_=df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD], positive_values=True
+            series_=covidtracking_df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
+            positive_values=True,
         ).values
 
-        df.loc[
+        covidtracking_df.loc[
             (state,), CONSECUTIVE_DECREASE_NEW_CASES_3DCS_FIELD
         ] = get_consecutive_positive_or_negative_values(
-            series_=df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD], positive_values=False
+            series_=covidtracking_df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
+            positive_values=False,
         ).values
 
         # Calculate criteria 1A: must see at least 9 days of a decrease in new cases over a 14 day window.
-        df.loc[
+        covidtracking_df.loc[
             (state,), MAX_RUN_OF_DECREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
         ] = get_max_run_in_window(
-            series_=df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
+            series_=covidtracking_df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
             positive_values=False,
             window_size=14,
         ).values
 
-        df.loc[(state,), CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD] = (
-            df.loc[
+        covidtracking_df.loc[
+            (state,), CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD
+        ] = (
+            covidtracking_df.loc[
                 (state,), MAX_RUN_OF_DECREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
             ]
             >= 10
         ).values
 
         # Calculate criteria 1B: must not see 5 or more days of an increase in new cases over a 14 day window.
-        df.loc[
+        covidtracking_df.loc[
             (state,), MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
         ] = get_max_run_in_window(
-            series_=df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
+            series_=covidtracking_df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
             positive_values=True,
             window_size=14,
         ).values
 
-        df.loc[(state,), CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD] = (
-            df.loc[
+        covidtracking_df.loc[(state,), CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD] = (
+            covidtracking_df.loc[
                 (state,), MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
             ]
             < 5
         ).values
 
         # Calculate criteria 1C: new cases on T-0 must be < T-14.
-        df.loc[(state,), NEW_CASES_TODAY_MINUS_NEW_CASES_14_DAYS_AGO_3DCS_FIELD] = (
-            df.loc[(state,), NEW_CASES_3DCS_FIELD].diff(periods=14).values
+        covidtracking_df.loc[
+            (state,), NEW_CASES_TODAY_MINUS_NEW_CASES_14_DAYS_AGO_3DCS_FIELD
+        ] = (
+            covidtracking_df.loc[(state,), NEW_CASES_3DCS_FIELD].diff(periods=14).values
         )
-        df.loc[(state,), CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD] = (
-            df.loc[(state,), NEW_CASES_TODAY_MINUS_NEW_CASES_14_DAYS_AGO_3DCS_FIELD] < 0
+        covidtracking_df.loc[(state,), CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD] = (
+            covidtracking_df.loc[
+                (state,), NEW_CASES_TODAY_MINUS_NEW_CASES_14_DAYS_AGO_3DCS_FIELD
+            ]
+            < 0
         ).values
 
         # Calculate criteria 1D: total cases from the last 14 days must be less than 10 per 100k population.
-        df.loc[(state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_FIELD] = (
-            df.loc[(state,), NEW_CASES_FIELD]
+        covidtracking_df.loc[(state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_FIELD] = (
+            covidtracking_df.loc[(state,), NEW_CASES_FIELD]
             .fillna(value=0)
             .rolling(window=14, min_periods=1, center=False)
             .sum()
             .values
         )
         state_population = float(state_population_data.loc[state][0])
-        df.loc[
+        covidtracking_df.loc[
             (state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_FIELD
         ] = (
-            (100000.0 * df.loc[(state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_FIELD])
+            (
+                100000.0
+                * covidtracking_df.loc[(state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_FIELD]
+            )
             / state_population
         ).values
 
-        df.loc[
+        covidtracking_df.loc[
             (state,),
             TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_LOWER_THAN_THRESHOLD_FIELD,
         ] = (
-            df.loc[
+            covidtracking_df.loc[
                 (state,), TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_FIELD
             ]
             <= 10
         ).values
 
-        df.loc[
+        covidtracking_df.loc[
             (state,),
             TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_PREVIOUSLY_ELEVATED_FIELD,
         ] = (
             (
-                df.loc[
+                covidtracking_df.loc[
                     (state,),
                     TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_LOWER_THAN_THRESHOLD_FIELD,
                 ]
@@ -352,20 +374,20 @@ def transform_covidtracking_data(df):
         ).values
 
         # To be true on 1D, the state must be (1) lower than the threshold, AND (2) previously above the threshold.
-        df.loc[(state,), CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE] = (
-            df.loc[
+        covidtracking_df.loc[(state,), CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE] = (
+            covidtracking_df.loc[
                 (state,),
                 TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_PREVIOUSLY_ELEVATED_FIELD,
             ]
-            & df.loc[
+            & covidtracking_df.loc[
                 (state,),
                 TOTAL_NEW_CASES_IN_14_DAY_WINDOW_PER_100_K_POPULATION_LOWER_THAN_THRESHOLD_FIELD,
             ]
         ).values
 
         # Calculate a textual indicator function for the rebound.
-        df.loc[(state,), INDICATION_OF_NEW_CASES_REBOUND_FIELD] = (
-            df.loc[
+        covidtracking_df.loc[(state,), INDICATION_OF_NEW_CASES_REBOUND_FIELD] = (
+            covidtracking_df.loc[
                 (state,),
                 [
                     MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD,
@@ -375,154 +397,197 @@ def transform_covidtracking_data(df):
         ).values
 
         # Calculate all of the criteria combined in category 1.
-        df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD] = (
+        covidtracking_df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD] = (
             (
-                df.loc[(state,), CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD]
-                & df.loc[(state,), CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD]
-                & df.loc[(state,), CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD]
+                covidtracking_df.loc[
+                    (state,), CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD
+                ]
+                & covidtracking_df.loc[
+                    (state,), CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD
+                ]
+                & covidtracking_df.loc[
+                    (state,), CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD
+                ]
             )
-            | df.loc[(state,), CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE]
+            | covidtracking_df.loc[(state,), CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE]
         ).values
 
         ###### Calculate criteria category 2. ######
         # For the criteria, we must add positive to negative tests to get the total (discarding inconclusive).
-        df.loc[(state,), NEW_TESTS_TOTAL_FIELD] = (
-            df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD]
-            + df.loc[(state,), NEW_CASES_NEGATIVE_SOURCE_FIELD]
+        covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_FIELD] = (
+            covidtracking_df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD]
+            + covidtracking_df.loc[(state,), NEW_CASES_NEGATIVE_SOURCE_FIELD]
         ).values
 
-        new_tests_total_negatives_removed = df.loc[
+        new_tests_total_negatives_removed = covidtracking_df.loc[
             (state,), NEW_TESTS_TOTAL_FIELD
         ].values
         new_tests_total_negatives_removed[new_tests_total_negatives_removed < 0] = None
 
-        df.loc[(state,), NEW_TESTS_TOTAL_FIELD] = new_tests_total_negatives_removed
+        covidtracking_df.loc[
+            (state,), NEW_TESTS_TOTAL_FIELD
+        ] = new_tests_total_negatives_removed
 
-        df.loc[(state,), NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD] = (
-            df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
+        covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD] = (
+            covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
             .rolling(window=3, min_periods=1, center=False)
             .mean()
             .values
         )
 
-        df.loc[
+        covidtracking_df.loc[
             (state,), NEW_TESTS_TOTAL_3DCS_FIELD
         ] = fit_and_predict_cubic_spline_in_r(
-            series_=df.loc[(state,), NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD],
+            series_=covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD],
             smoothing_parameter=0.5,
         ).values
 
-        df.loc[(state,), POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD] = (
-            df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD]
+        covidtracking_df.loc[(state,), POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD] = (
+            covidtracking_df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD]
             .rolling(window=3, min_periods=1, center=False)
             .mean()
             .values
         )
 
-        df.loc[
+        covidtracking_df.loc[
             (state,), POSITIVE_TESTS_TOTAL_3DCS_FIELD
         ] = fit_and_predict_cubic_spline_in_r(
-            series_=df.loc[(state,), POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD],
+            series_=covidtracking_df.loc[
+                (state,), POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD
+            ],
             smoothing_parameter=0.5,
         ).values
 
-        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD] = (
-            df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD].astype(float)
-            / df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
+        covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD] = (
+            covidtracking_df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD].astype(
+                float
+            )
+            / covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
         ).values
 
-        df.loc[(state,), FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
-            df.loc[(state,), POSITIVE_TESTS_TOTAL_3DCS_FIELD].astype(float)
-            / df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD]
+        covidtracking_df.loc[(state,), FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
+            covidtracking_df.loc[(state,), POSITIVE_TESTS_TOTAL_3DCS_FIELD].astype(
+                float
+            )
+            / covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD]
         ).values
 
-        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
-            100.0 * df.loc[(state,), FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD]
+        covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
+            100.0
+            * covidtracking_df.loc[(state,), FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD]
         ).values
 
-        df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD] = (
-            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD].diff(periods=1)
+        covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD] = (
+            covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD].diff(
+                periods=1
+            )
         ).values
 
         # Calculate 2A: Achieve 14 or more consecutive days of decline in percent positive ... with up to 2-3
         # consecutive days of increasing or stable percent positive allowed as a grace period if data are inconsistent.
-        df.loc[
+        covidtracking_df.loc[
             (state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD
         ] = get_max_run_in_window(
-            series_=df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD],
+            series_=covidtracking_df.loc[
+                (state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD
+            ],
             window_size=14,
             positive_values=False,
         ).values
 
-        df.loc[
+        covidtracking_df.loc[
             (state,), MAX_RUN_OF_INCREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD
         ] = get_max_run_in_window(
-            series_=df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD],
+            series_=covidtracking_df.loc[
+                (state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD
+            ],
             window_size=14,
             positive_values=True,
         ).values
 
-        df.loc[(state,), CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD] = (
-            df.loc[(state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD]
+        covidtracking_df.loc[
+            (state,), CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD
+        ] = (
+            covidtracking_df.loc[
+                (state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD
+            ]
             >= 11
         ).values
 
         # Calculate 2B: Total test volume is stable or increasing.
-        df.loc[(state,), NEW_TESTS_TOTAL_DIFF_3DCS_FIELD] = (
-            df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD].diff(periods=1).values
+        covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_DIFF_3DCS_FIELD] = (
+            covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD]
+            .diff(periods=1)
+            .values
         )
 
-        df.loc[
+        covidtracking_df.loc[
             (state,), MAX_RUN_OF_INCREASING_TOTAL_TESTS_3DCS_FIELD
         ] = get_max_run_in_window(
-            series_=df.loc[(state,), NEW_TESTS_TOTAL_DIFF_3DCS_FIELD],
+            series_=covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_DIFF_3DCS_FIELD],
             window_size=14,
             positive_values=False,
         ).values
 
-        df.loc[(state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD] = (
-            df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD].diff(periods=14) >= 0
+        covidtracking_df.loc[
+            (state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD
+        ] = (
+            covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD].diff(periods=14)
+            >= 0
         ).values
 
         # Calculate 2C: 14th day [of positive percentage of tests] must be lower than 1st day.
-        df.loc[(state,), CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD] = (
-            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD].diff(periods=14) < 0
+        covidtracking_df.loc[
+            (state,), CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD
+        ] = (
+            covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD].diff(
+                periods=14
+            )
+            < 0
         ).values
 
         # Calculate 2D: Near-zero percent positive tests. [What is the explicit threshold here?]
-        df.loc[(state,), CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD] = (
-            df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] <= 1
+        covidtracking_df.loc[
+            (state,), CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD
+        ] = (
+            covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] <= 1
         ).values
 
         # Calculate all of the criteria combined in category 2.
-        df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD] = (
+        covidtracking_df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD] = (
             (
-                df.loc[(state,), CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD]
-                & df.loc[
+                covidtracking_df.loc[
+                    (state,), CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD
+                ]
+                & covidtracking_df.loc[
                     (state,), CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD
                 ]
-                & df.loc[(state,), CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD]
+                & covidtracking_df.loc[
+                    (state,), CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD
+                ]
             )
-            | df.loc[(state,), CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD]
+            | covidtracking_df.loc[
+                (state,), CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD
+            ]
         ).values
 
         # Calculate all of the criteria combined.
-        df.loc[(state,), CDC_CRITERIA_ALL_COMBINED_FIELD] = (
-            df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD]
-            & df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
+        covidtracking_df.loc[(state,), CDC_CRITERIA_ALL_COMBINED_FIELD] = (
+            covidtracking_df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD]
+            & covidtracking_df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
         ).values
 
         # Calculate all of the criteria combined.
-        df.loc[(state,), CDC_CRITERIA_ALL_COMBINED_OR_FIELD] = (
-            df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD]
-            | df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
+        covidtracking_df.loc[(state,), CDC_CRITERIA_ALL_COMBINED_OR_FIELD] = (
+            covidtracking_df.loc[(state,), CDC_CRITERIA_1_COMBINED_FIELD]
+            | covidtracking_df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
         ).values
 
     # Add an update time.
-    df[LAST_UPDATED_FIELD] = datetime.datetime.now()
+    covidtracking_df[LAST_UPDATED_FIELD] = datetime.datetime.now()
 
     # Remove the multi-index, converting date and state back to just columns.
-    df = df.reset_index(drop=False)
+    covidtracking_df = covidtracking_df.reset_index(drop=False)
 
     # Join to lags of important variables that we want to plot in sparklines.
     for field_to_lag, num_lags in [
@@ -530,20 +595,22 @@ def transform_covidtracking_data(df):
         (PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD, 31),
         (NEW_TESTS_TOTAL_3DCS_FIELD, 31),
     ]:
-        lags = generate_lags(df=df, column=field_to_lag, num_lags=num_lags)
-        df = df.merge(
+        lags = generate_lags(
+            df=covidtracking_df, column=field_to_lag, num_lags=num_lags
+        )
+        covidtracking_df = covidtracking_df.merge(
             right=lags, on=[STATE_SOURCE_FIELD, DATE_SOURCE_FIELD], how="left"
         )
 
     # Drop American Samoa because it's not reporting data
-    df = df.loc[
-        df[STATE_SOURCE_FIELD] != "American Samoa",
+    covidtracking_df = covidtracking_df.loc[
+        covidtracking_df[STATE_SOURCE_FIELD] != "American Samoa",
     ]
 
     # Copy state values into column called "State" instead of "state".
-    df[STATE_FIELD] = df[STATE_SOURCE_FIELD]
+    covidtracking_df[STATE_FIELD] = covidtracking_df[STATE_SOURCE_FIELD]
 
-    return df
+    return covidtracking_df
 
 
 def transform_cdc_ili_data(df):
@@ -573,7 +640,7 @@ def transform_cdc_ili_data(df):
     return df
 
 
-def transform_cdc_data(cdc_current_df, cdc_historical_df):
+def transform_cdc_beds_data(cdc_current_df, cdc_historical_df):
     # Add date to index
     cdc_df = pd.concat([cdc_current_df, cdc_historical_df], axis=0)
     cdc_df[DATE_SOURCE_FIELD] = pd.to_datetime(cdc_df[DATE_SOURCE_FIELD])
