@@ -94,6 +94,24 @@ CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD = "CDC Criteria 3A"
 CDC_CRITERIA_3_COMBINED_FIELD = "CDC Criteria 3 (Combined)"
 PHASE_1_OCCUPATION_THRESHOLD = 0.80  # Beds must be less than 80% full
 
+# Criteria Category 5 Fields.
+PERCENT_ILI = "%UNWEIGHTED ILI"
+PERCENT_ILI_TODAY_MINUS_PERCENT_ILI_14_DAYS_AGO = "Percent ILI today minus 2 weeks ago"
+PERCENT_ILI_SPLINE = "Percent ILI (Weekly Cubic Spline)"
+PERCENT_ILI_SPLINE_DIFF = "Change in Percent ILI (WCS)"
+MAX_RUN_OF_DECREASING_PERCENT_ILI_SPLINE_DIFF = (
+    "Max Run of Decreasing Percent ILI (WCS)"
+)
+TOTAL_ILI = "ILITOTAL"
+TOTAL_ILI_TODAY_MINUS_TOTAL_ILI_14_DAYS_AGO = "Total ILI today minus 2 weeks ago"
+TOTAL_ILI_SPLINE = "Total ILI (WCS)"
+TOTAL_ILI_SPLINE_DIFF = "Change in Total ILI (WCS)"
+MAX_RUN_OF_DECREASING_TOTAL_ILI_SPLINE_DIFF = "Max Run of Decreasing Total ILI (WCS)"
+CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI = "CDC Criteria 5A"
+CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI = "CDC Criteria 5B"
+CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI = "CDC Criteria 5C"
+CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI = "CDC Criteria 5D"
+CDC_CRITERIA_5_COMBINED = "CDC Criteria 5 (Partically combined, 5A-5D)"
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
@@ -187,9 +205,17 @@ CRITERIA_3_SUMMARY_COLUMNS = [
     CDC_CRITERIA_3_COMBINED_FIELD,
 ]
 
+CRITERIA_5_SUMMARY_COLUMNS = [
+    STATE_FIELD,
+    CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI,
+    CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI,
+    CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
+    CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI,
+    CDC_CRITERIA_5_COMBINED,
+]
 
-def transform_covidtracking_data(covidtracking_df):
 
+def transform_covidtracking_data(covidtracking_df, cdc_ili_df):
     # Replace abbreviations with full names.
     state_abbreviations_to_names = get_state_abbreviations_to_names()
     covidtracking_df = covidtracking_df.replace(
@@ -214,7 +240,7 @@ def transform_covidtracking_data(covidtracking_df):
     state_population_data = extract_state_population_data()
 
     for state in states:
-        print(f"Processing state {state}...")
+        print(f"Processing covid tracking data for state {state}...")
 
         ###### Calculate criteria category 1. ######
         # Calculate new cases (raw).
@@ -613,36 +639,122 @@ def transform_covidtracking_data(covidtracking_df):
     return covidtracking_df
 
 
-def transform_cdc_ili_data(df):
-    # Use the first row of the index as the index names.
-    df.index.names = df.index[0]
-
-    # Drop the row containing the labels, and set a new multi-index using the region, year, and week.
-    df = df.iloc[1:].reset_index()
-
+def transform_cdc_ili_data(ili_df):
     # Validate that the only region type is states to sanity check data.
-    assert set(df["REGION TYPE"].unique()) == {"States"}
+    assert set(ili_df["REGION TYPE"].unique()) == {"States"}
 
     # Create a new column that combines the `YEAR` and `WEEK` column.
     # Note: The `-6` sets the date field to the start of the weekend (Saturday) for each week. We also subtract 1 week
     #   to start the weeks at zero and ensure that they align with `https://www.epochconverter.com/weeks/2020`.
-    df[DATE_SOURCE_FIELD] = pd.to_datetime(
-        df["YEAR"] + "-" + (df["WEEK"].astype(int) - 1).astype(str) + "-6",
+    ili_df[DATE_SOURCE_FIELD] = pd.to_datetime(
+        ili_df["YEAR"].astype(str)
+        + "-"
+        + (ili_df["WEEK"].astype(int) - 1).astype(str)
+        + "-6",
         format="%Y-%U-%w",
     )
 
     # Rename the region field to match the `state` field present in other data frames.
-    df = df.rename(columns={"REGION": STATE_FIELD})
+    ili_df = ili_df.rename(columns={"REGION": STATE_FIELD})
+
+    states = ili_df[STATE_FIELD].unique()
 
     # Create a new multi-index containing the state name (`REGION`) and timestamp of the week.
-    df = df.set_index(keys=[STATE_FIELD, DATE_SOURCE_FIELD])
+    ili_df = ili_df.set_index(keys=[STATE_FIELD, DATE_SOURCE_FIELD])
 
-    return df
+    # Sort by the index: state ascending, date ascending.
+    ili_df = ili_df.sort_index()
+
+    # Replace `X` with null.
+    ili_df = ili_df.replace(to_replace="X", value=None)
+
+    # Convert to floats.
+    ili_df[TOTAL_ILI] = ili_df[TOTAL_ILI].astype(float)
+    ili_df[PERCENT_ILI] = ili_df[PERCENT_ILI].astype(float)
+
+    for state in states:
+        print(f"Processing CDC ILI data for state {state}...")
+
+        ###### Calculate criteria category 5. ######
+        # Calculate total cases (spline).
+        ili_df.loc[(state,), TOTAL_ILI_SPLINE] = fit_and_predict_cubic_spline_in_r(
+            series_=ili_df.loc[(state,), TOTAL_ILI], smoothing_parameter=0.5
+        ).values
+
+        # Calculate percent cases (spline).
+        ili_df.loc[(state,), PERCENT_ILI_SPLINE] = fit_and_predict_cubic_spline_in_r(
+            series_=ili_df.loc[(state,), PERCENT_ILI], smoothing_parameter=0.5
+        ).values
+
+        # Calculate change in total ILI
+        ili_df.loc[(state,), TOTAL_ILI_SPLINE_DIFF] = (
+            ili_df.loc[(state,), TOTAL_ILI_SPLINE].diff(periods=1).values
+        )
+
+        # Calculate change in percent ILI
+        ili_df.loc[(state,), PERCENT_ILI_SPLINE_DIFF] = (
+            ili_df.loc[(state,), PERCENT_ILI_SPLINE].diff(periods=1).values
+        )
+
+        # Calculate criteria 5A: must see two consecutive declines in weekly total ILI data.
+        ili_df.loc[
+            (state,), MAX_RUN_OF_DECREASING_TOTAL_ILI_SPLINE_DIFF
+        ] = get_max_run_in_window(
+            series_=ili_df.loc[(state,), TOTAL_ILI_SPLINE_DIFF],
+            positive_values=False,
+            window_size=2,
+        ).values
+
+        ili_df.loc[(state,), CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI] = (
+            ili_df.loc[(state,), MAX_RUN_OF_DECREASING_TOTAL_ILI_SPLINE_DIFF] >= 2
+        ).values
+
+        # Calculate criteria 5B: current cases must be lower than cases 2 weeks ago.
+        ili_df.loc[(state,), TOTAL_ILI_TODAY_MINUS_TOTAL_ILI_14_DAYS_AGO] = (
+            ili_df.loc[(state,), TOTAL_ILI].diff(periods=2).values
+        )
+        ili_df.loc[(state,), CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI] = (
+            ili_df.loc[(state,), TOTAL_ILI_TODAY_MINUS_TOTAL_ILI_14_DAYS_AGO] < 0
+        ).values
+
+        # Calculate criteria 5C: must see two consecutive declines in weekly percent ILI data.
+        ili_df.loc[
+            (state,), MAX_RUN_OF_DECREASING_PERCENT_ILI_SPLINE_DIFF
+        ] = get_max_run_in_window(
+            series_=ili_df.loc[(state,), PERCENT_ILI_SPLINE_DIFF],
+            positive_values=False,
+            window_size=2,
+        ).values
+
+        ili_df.loc[(state,), CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI] = (
+            ili_df.loc[(state,), MAX_RUN_OF_DECREASING_PERCENT_ILI_SPLINE_DIFF] >= 2
+        ).values
+
+        # Calculate criteria 5B: current cases must be lower than cases 2 weeks ago.
+        ili_df.loc[(state,), PERCENT_ILI_TODAY_MINUS_PERCENT_ILI_14_DAYS_AGO] = (
+            ili_df.loc[(state,), PERCENT_ILI].diff(periods=2).values
+        )
+        ili_df.loc[(state,), CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI] = (
+            ili_df.loc[(state,), PERCENT_ILI_TODAY_MINUS_PERCENT_ILI_14_DAYS_AGO] < 0
+        ).values
+
+        # Calculate the combined rating so far.
+        ili_df.loc[(state,), CDC_CRITERIA_5_COMBINED] = (
+            ili_df.loc[(state,), CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI]
+            & ili_df.loc[(state,), CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI]
+            & ili_df.loc[(state,), CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI]
+            & ili_df.loc[(state,), CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI]
+        ).values
+
+    # Remove the multi-index, converting date and state back to just columns.
+    ili_df = ili_df.reset_index(drop=False)
+
+    return ili_df
 
 
-def transform_cdc_beds_data(cdc_current_df, cdc_historical_df):
+def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
     # Add date to index
-    cdc_df = pd.concat([cdc_current_df, cdc_historical_df], axis=0)
+    cdc_df = pd.concat([cdc_beds_current_df, cdc_beds_historical_df], axis=0)
     cdc_df[DATE_SOURCE_FIELD] = pd.to_datetime(cdc_df[DATE_SOURCE_FIELD])
     cdc_df = cdc_df.set_index(DATE_SOURCE_FIELD, append=True)
     cdc_df = cdc_df.sort_index()  # ascending date and state

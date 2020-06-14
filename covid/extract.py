@@ -172,8 +172,9 @@ def extract_cdc_ili_data():
     )
     filenames_to_contents_map = unzip_string(response.content)
 
-    df = pd.read_csv(BytesIO(filenames_to_contents_map[ILI_NET_CSV]))
-    df = df.set_index("State")
+    df = pd.read_csv(
+        filepath_or_buffer=BytesIO(filenames_to_contents_map[ILI_NET_CSV]), skiprows=1
+    )
 
     return df
 
