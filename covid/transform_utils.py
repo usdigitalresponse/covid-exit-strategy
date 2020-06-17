@@ -6,7 +6,7 @@ from rpy2 import robjects as robjects
 from scipy import interpolate as interpolate
 
 from covid.extract import DATE_SOURCE_FIELD
-from covid.extract import STATE_SOURCE_FIELD
+from covid.extract import STATE_FIELD
 
 
 def fit_and_predict_cubic_spline(series_):
@@ -110,9 +110,9 @@ def generate_lag_column_name_formatter_and_column_names(column_name, num_lags=12
     return column_name_formatter, lag_column_names
 
 
-def generate_lags(df, column, num_lags=121):
+def generate_lags(df, column, num_lags=121, lag_timedelta=datetime.timedelta(days=1)):
     # TODO(lbrown): Refactor this method to be more efficient; this is just the quick and dirty way.
-    states = df[STATE_SOURCE_FIELD].unique()
+    states = df[STATE_FIELD].unique()
 
     column_names = [DATE_SOURCE_FIELD]
 
@@ -126,7 +126,7 @@ def generate_lags(df, column, num_lags=121):
     column_names.extend(lag_column_names)
 
     lags_df = pd.DataFrame(
-        index=pd.Index(data=states, name=STATE_SOURCE_FIELD), columns=column_names
+        index=pd.Index(data=states, name=STATE_FIELD), columns=column_names
     )
 
     today = pd.to_datetime(df[DATE_SOURCE_FIELD]).max()
@@ -139,8 +139,7 @@ def generate_lags(df, column, num_lags=121):
             print(f"For field {column}, processing {state} for lag {lag}.")
             # Lookup the historical entry.
             value = df.loc[
-                (df[STATE_SOURCE_FIELD] == state)
-                & (df[DATE_SOURCE_FIELD] == date_to_lookup),
+                (df[STATE_FIELD] == state) & (df[DATE_SOURCE_FIELD] == date_to_lookup),
                 column,
             ]
 
@@ -150,7 +149,7 @@ def generate_lags(df, column, num_lags=121):
                 value = value.iloc[0]
                 lags_df.loc[state, column_name_formatter.format(lag)] = value
 
-            date_to_lookup = date_to_lookup - datetime.timedelta(days=1)
+            date_to_lookup = date_to_lookup - lag_timedelta
 
     lags_df = lags_df.reset_index()
     return lags_df

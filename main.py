@@ -6,7 +6,6 @@ from covid.extract import extract_cdc_beds_current_data
 from covid.extract import extract_cdc_beds_historical_data
 from covid.extract import extract_cdc_ili_data
 from covid.extract import extract_covidtracking_historical_data
-from covid.extract import STATE_SOURCE_FIELD
 from covid.load import get_sheets_client
 from covid.load import post_dataframe_to_google_sheets
 from covid.transform import CRITERIA_1_SUMMARY_COLUMNS
@@ -54,7 +53,7 @@ def extract_transform_and_load_covid_data():
     transformed_cdc_ili_df = transform_cdc_ili_data(ili_df=cdc_ili_df)
 
     transformed_covidtracking_df = transform_covidtracking_data(
-        covidtracking_df=covidtracking_df, cdc_ili_df=cdc_ili_df
+        covidtracking_df=covidtracking_df
     )
 
     # Upload category 3A data.
@@ -71,16 +70,6 @@ def extract_transform_and_load_covid_data():
         df=transformed_cdc_beds_df,
         workbook_key=CDC_CRITERIA_3_GOOGLE_WORKBOOK_KEY,
         tab_name="Historical Data",
-        credentials=credentials,
-    )
-
-    # Upload data for just NY.
-    post_dataframe_to_google_sheets(
-        df=transformed_covidtracking_df.loc[
-            transformed_covidtracking_df[STATE_SOURCE_FIELD] == "NY",
-        ],
-        workbook_key=CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY,
-        tab_name=WORK_IN_PROGRESS_NY_ONLY_TAB_NAME,
         credentials=credentials,
     )
 

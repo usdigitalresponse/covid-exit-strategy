@@ -95,14 +95,16 @@ CDC_CRITERIA_3_COMBINED_FIELD = "CDC Criteria 3 (Combined)"
 PHASE_1_OCCUPATION_THRESHOLD = 0.80  # Beds must be less than 80% full
 
 # Criteria Category 5 Fields.
-PERCENT_ILI = "%UNWEIGHTED ILI"
+PERCENT_ILI_SOURCE = "%UNWEIGHTED ILI"
+PERCENT_ILI = "Percent ILI"
 PERCENT_ILI_TODAY_MINUS_PERCENT_ILI_14_DAYS_AGO = "Percent ILI today minus 2 weeks ago"
 PERCENT_ILI_SPLINE = "Percent ILI (Weekly Cubic Spline)"
 PERCENT_ILI_SPLINE_DIFF = "Change in Percent ILI (WCS)"
 MAX_RUN_OF_DECREASING_PERCENT_ILI_SPLINE_DIFF = (
     "Max Run of Decreasing Percent ILI (WCS)"
 )
-TOTAL_ILI = "ILITOTAL"
+TOTAL_ILI_SOURCE = "ILITOTAL"
+TOTAL_ILI = "Total ILI"
 TOTAL_ILI_TODAY_MINUS_TOTAL_ILI_14_DAYS_AGO = "Total ILI today minus 2 weeks ago"
 TOTAL_ILI_SPLINE = "Total ILI (WCS)"
 TOTAL_ILI_SPLINE_DIFF = "Change in Total ILI (WCS)"
@@ -112,6 +114,10 @@ CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI = "CDC Criteria 5B"
 CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI = "CDC Criteria 5C"
 CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI = "CDC Criteria 5D"
 CDC_CRITERIA_5_COMBINED = "CDC Criteria 5 (Partically combined, 5A-5D)"
+
+# We choose 10 because that represents 9 weeks (63 days).
+PERCENT_ILI_NUM_LAGS = 10
+TOTAL_ILI_NUM_LAGS = 10
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
@@ -205,8 +211,24 @@ CRITERIA_3_SUMMARY_COLUMNS = [
     CDC_CRITERIA_3_COMBINED_FIELD,
 ]
 
+# Define the list of columns that should appear in summary workbooks.
+# TODO: is there a smarter way to keep these in sync with what's generated?
+_, total_ili_lag_fields = generate_lag_column_name_formatter_and_column_names(
+    column_name=TOTAL_ILI, num_lags=TOTAL_ILI_NUM_LAGS
+)
+
+_, percent_ili_lag_fields = generate_lag_column_name_formatter_and_column_names(
+    column_name=PERCENT_ILI, num_lags=PERCENT_ILI_NUM_LAGS
+)
+
 CRITERIA_5_SUMMARY_COLUMNS = [
     STATE_FIELD,
+    # Unpack all of the lag fields.
+    *total_ili_lag_fields,
+    # Repeat the T-0 field to serve as a spacer between sparklines.
+    TOTAL_ILI,
+    *percent_ili_lag_fields,
+    PERCENT_ILI,
     CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI,
     CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI,
     CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
@@ -215,13 +237,19 @@ CRITERIA_5_SUMMARY_COLUMNS = [
 ]
 
 
-def transform_covidtracking_data(covidtracking_df, cdc_ili_df):
+def transform_covidtracking_data(covidtracking_df):
+    # Rename state field into column called "State" instead of "state".
+    covidtracking_df = covidtracking_df.rename(
+        columns={STATE_SOURCE_FIELD: STATE_FIELD}
+    )
+
     # Replace abbreviations with full names.
     state_abbreviations_to_names = get_state_abbreviations_to_names()
     covidtracking_df = covidtracking_df.replace(
-        {STATE_SOURCE_FIELD: state_abbreviations_to_names}
+        {STATE_FIELD: state_abbreviations_to_names}
     )
-    states = covidtracking_df[STATE_SOURCE_FIELD].unique()
+
+    states = covidtracking_df[STATE_FIELD].unique()
 
     # Make the date column explicitly a date
     covidtracking_df[DATE_SOURCE_FIELD] = pd.to_datetime(
@@ -229,9 +257,7 @@ def transform_covidtracking_data(covidtracking_df, cdc_ili_df):
     )
 
     # Use a multi-index for state and date.
-    covidtracking_df.set_index(
-        keys=[STATE_SOURCE_FIELD, DATE_SOURCE_FIELD], inplace=True
-    )
+    covidtracking_df.set_index(keys=[STATE_FIELD, DATE_SOURCE_FIELD], inplace=True)
 
     # Sort by the index: state ascending, date ascending.
     covidtracking_df = covidtracking_df.sort_index()
@@ -625,16 +651,13 @@ def transform_covidtracking_data(covidtracking_df, cdc_ili_df):
             df=covidtracking_df, column=field_to_lag, num_lags=num_lags
         )
         covidtracking_df = covidtracking_df.merge(
-            right=lags, on=[STATE_SOURCE_FIELD, DATE_SOURCE_FIELD], how="left"
+            right=lags, on=[STATE_FIELD, DATE_SOURCE_FIELD], how="left"
         )
 
     # Drop American Samoa because it's not reporting data
     covidtracking_df = covidtracking_df.loc[
-        covidtracking_df[STATE_SOURCE_FIELD] != "American Samoa",
+        covidtracking_df[STATE_FIELD] != "American Samoa",
     ]
-
-    # Copy state values into column called "State" instead of "state".
-    covidtracking_df[STATE_FIELD] = covidtracking_df[STATE_SOURCE_FIELD]
 
     return covidtracking_df
 
@@ -655,7 +678,13 @@ def transform_cdc_ili_data(ili_df):
     )
 
     # Rename the region field to match the `state` field present in other data frames.
-    ili_df = ili_df.rename(columns={"REGION": STATE_FIELD})
+    ili_df = ili_df.rename(
+        columns={
+            "REGION": STATE_FIELD,
+            PERCENT_ILI_SOURCE: PERCENT_ILI,
+            TOTAL_ILI_SOURCE: TOTAL_ILI,
+        }
+    )
 
     states = ili_df[STATE_FIELD].unique()
 
@@ -748,6 +777,21 @@ def transform_cdc_ili_data(ili_df):
 
     # Remove the multi-index, converting date and state back to just columns.
     ili_df = ili_df.reset_index(drop=False)
+
+    # Join to lags of important variables that we want to plot in sparklines.
+    for field_to_lag, num_lags in [
+        (PERCENT_ILI, PERCENT_ILI_NUM_LAGS),
+        (TOTAL_ILI, TOTAL_ILI_NUM_LAGS),
+    ]:
+        lags = generate_lags(
+            df=ili_df,
+            column=field_to_lag,
+            num_lags=num_lags,
+            lag_timedelta=datetime.timedelta(days=7),
+        )
+        ili_df = ili_df.merge(
+            right=lags, on=[STATE_FIELD, DATE_SOURCE_FIELD], how="left"
+        )
 
     return ili_df
 
