@@ -113,7 +113,7 @@ CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI = "CDC Criteria 5A"
 CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI = "CDC Criteria 5B"
 CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI = "CDC Criteria 5C"
 CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI = "CDC Criteria 5D"
-CDC_CRITERIA_5_COMBINED = "CDC Criteria 5 (Partically combined, 5A-5D)"
+CDC_CRITERIA_5_COMBINED = "CDC Criteria 5 (Partially combined, 5A-5D)"
 
 # We choose 10 because that represents 9 weeks (63 days).
 PERCENT_ILI_NUM_LAGS = 10
@@ -738,7 +738,7 @@ def transform_cdc_ili_data(ili_df):
             ili_df.loc[(state,), MAX_RUN_OF_DECREASING_TOTAL_ILI_SPLINE_DIFF] >= 2
         ).values
 
-        # Calculate criteria 5B: current cases must be lower than cases 2 weeks ago.
+        # Calculate criteria 5B: weekly total must be lower than weekly total 2 weeks ago.
         ili_df.loc[(state,), TOTAL_ILI_TODAY_MINUS_TOTAL_ILI_14_DAYS_AGO] = (
             ili_df.loc[(state,), TOTAL_ILI].diff(periods=2).values
         )
@@ -759,7 +759,7 @@ def transform_cdc_ili_data(ili_df):
             ili_df.loc[(state,), MAX_RUN_OF_DECREASING_PERCENT_ILI_SPLINE_DIFF] >= 2
         ).values
 
-        # Calculate criteria 5B: current cases must be lower than cases 2 weeks ago.
+        # Calculate criteria 5D: weekly percent must be lower than weekly percent 2 weeks ago.
         ili_df.loc[(state,), PERCENT_ILI_TODAY_MINUS_PERCENT_ILI_14_DAYS_AGO] = (
             ili_df.loc[(state,), PERCENT_ILI].diff(periods=2).values
         )
