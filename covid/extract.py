@@ -172,13 +172,14 @@ def extract_cdc_ili_data():
     )
     filenames_to_contents_map = unzip_string(response.content)
 
-    df = pd.read_csv(BytesIO(filenames_to_contents_map[ILI_NET_CSV]))
-    df = df.set_index("State")
+    df = pd.read_csv(
+        filepath_or_buffer=BytesIO(filenames_to_contents_map[ILI_NET_CSV]), skiprows=1
+    )
 
     return df
 
 
-def extract_current_cdc_data():
+def extract_cdc_beds_current_data():
     inpatient_bed_df = extract_cdc_inpatient_beds()
     icu_bed_df = extract_cdc_icu_beds()
     hospitals_reporting_df = extract_cdc_facilities_reporting()
@@ -187,7 +188,7 @@ def extract_current_cdc_data():
     return cdc_df
 
 
-def extract_historical_cdc_data(credentials):
+def extract_cdc_beds_historical_data(credentials):
     cdc_historical_df = gspread2df.download(
         CATEGORY_3_DATA_GOOGLE_SHEET_KEY,
         CATEGORY_3_HISTORICAL_DATA_TAB,
