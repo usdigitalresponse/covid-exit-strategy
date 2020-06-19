@@ -125,8 +125,8 @@ def extract_transform_and_load_covid_data():
         credentials=credentials,
     )
 
-    # It appears we're uploading so much data we're hitting a timeout. So pause before this last spreadsheet, which
-    # is enormous.
+    # It appears we're uploading so much data we're hitting a quota of some kind. So pause before this last spreadsheet,
+    # which is enormous.
     time.sleep(20)
 
     # Upload data for all states.
