@@ -1,5 +1,6 @@
 # Define source field names.
 import os
+import time
 
 from covid.constants import PATH_TO_SERVICE_ACCOUNT_KEY
 from covid.extract import extract_cdc_beds_current_data
@@ -123,6 +124,10 @@ def extract_transform_and_load_covid_data():
         tab_name=STATE_SUMMARY_TAB_NAME,
         credentials=credentials,
     )
+
+    # It appears we're uploading so much data we're hitting a timeout. So pause before this last spreadsheet, which
+    # is enormous.
+    time.sleep(20)
 
     # Upload data for all states.
     post_dataframe_to_google_sheets(
