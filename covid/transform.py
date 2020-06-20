@@ -142,8 +142,30 @@ LAST_UPDATED_FIELD = "data_last_changed"
 STATE_FIELD = "State"
 
 # Define a pre-formatted string to be used for CDC criteria positive and negative streak fields.
-CDC_CRITERIA_POSITIVE_STREAK_PRE_FORMAT = "{criteria_field} Positive Streak"
-CDC_CRITERIA_NEGATIVE_STREAK_PRE_FORMAT = "{criteria_field} Negative Streak"
+CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT = "{criteria_field} Positive Streak"
+CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT = "{criteria_field} Negative Streak"
+
+# Define the list of CDC criteria fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD,
+    CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
+    CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
+    CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
+    CDC_CRITERIA_1_COMBINED_FIELD,
+]
+
+# Define the list of positive criteria streak fields that should appear in the state summary tab.
+CDC_CRITERIA_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of negative criteria streak fields that should appear in the state summary tab.
+CDC_CRITERIA_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_STREAK_STATE_SUMMARY_FIELDS
+]
+
 
 # Define the list of columns that should appear in the state summary tab.
 STATE_SUMMARY_COLUMNS = [
@@ -165,6 +187,8 @@ STATE_SUMMARY_COLUMNS = [
     CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
     CDC_CRITERIA_2_COMBINED_FIELD,
+    *CDC_CRITERIA_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     CDC_CRITERIA_ALL_COMBINED_FIELD,
     CDC_CRITERIA_ALL_COMBINED_OR_FIELD,
     LAST_RAN_FIELD,
@@ -731,7 +755,7 @@ def transform_covidtracking_data(covidtracking_df):
         # Add the positive streak series to the combined frame.
         covidtracking_df.loc[
             (state,),
-            CDC_CRITERIA_POSITIVE_STREAK_PRE_FORMAT.format(
+            CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(
                 criteria_field=criteria_field
             ),
         ] = positive_streak_series.values
@@ -739,7 +763,7 @@ def transform_covidtracking_data(covidtracking_df):
         # Add the negative streak series to the combined frame.
         covidtracking_df.loc[
             (state,),
-            CDC_CRITERIA_NEGATIVE_STREAK_PRE_FORMAT.format(
+            CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(
                 criteria_field=criteria_field
             ),
         ] = negative_streak_series.values
