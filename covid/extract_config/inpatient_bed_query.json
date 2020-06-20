@@ -11,7 +11,7 @@
                                 "From": [
                                     {
                                         "Name": "n",
-                                        "Entity": "NHSN_COVID19_NatEst_V2_Sapiano"
+                                        "Entity": "NHSN_COVID19_NatEst_Sapiano"
                                     }
                                 ],
                                 "Select": [
@@ -24,7 +24,7 @@
                                             },
                                             "Property": "statename"
                                         },
-                                        "Name": "NHSN_COVID19_NatEst_V2_Sapiano_050820.statename"
+                                        "Name": "NHSN_COVID19_NatEst_Sapiano_050820.statename"
                                     },
                                     {
                                         "Aggregation": {
@@ -40,7 +40,7 @@
                                             },
                                             "Function": 0
                                         },
-                                        "Name": "Sum(NHSN_COVID19_NatEst_V2_Sapiano.% Inpatient Beds Occupied)"
+                                        "Name": "Sum(NHSN_COVID19_NatEst_Sapiano.% Inpatient Beds Occupied)"
                                     },
                                     {
                                         "Aggregation": {
@@ -56,7 +56,7 @@
                                             },
                                             "Function": 3
                                         },
-                                        "Name": "Min(NHSN_COVID19_NatEst_V2_Sapiano.Number of Inpatient Beds Occupied)"
+                                        "Name": "Min(NHSN_COVID19_NatEst_Sapiano.Number of Inpatient Beds Occupied)"
                                     }
                                 ]
                             }
