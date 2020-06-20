@@ -12,7 +12,7 @@ from covid.transform_utils import get_max_run_in_window
 
 
 class TransformUtilsTest(unittest.TestCase):
-    def test_find_consecutive_positive_values(self):
+    def test_find_consecutive_positive_or_negative_values(self):
         assert_series_equal(
             get_consecutive_positive_or_negative_values(
                 series_=pd.Series([-1, 1, 2, -4, 3, 5]), positive_values=True
@@ -20,12 +20,13 @@ class TransformUtilsTest(unittest.TestCase):
             pd.Series([0, 1, 2, 0, 1, 2]),
         )
 
+        # Note: Zero is not counted as a positive value.
         assert_series_equal(
             get_consecutive_positive_or_negative_values(
                 series_=pd.Series([-1, -1, 0, 1, 2, 3, -15, -17.0]),
                 positive_values=True,
             ),
-            pd.Series([0, 0, 1, 2, 3, 4, 0, 0]),
+            pd.Series([0, 0, 0, 1, 2, 3, 0, 0]),
         )
 
         # Make sure we handle null values appropriately.

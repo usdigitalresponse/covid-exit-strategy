@@ -55,7 +55,6 @@ CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD = "CDC Criteria 1C"
 CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE = "CDC Criteria 1D"
 CDC_CRITERIA_1_COMBINED_FIELD = "CDC Criteria 1 (Combined)"
 
-
 # Criteria Category 2 Fields.
 NEW_TESTS_TOTAL_FIELD = "new_tests_total"
 NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD = "new_tests_total_3_day_average"
@@ -83,7 +82,6 @@ CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD = "CDC Criteria 2B"
 CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD = "CDC Criteria 2C"
 CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD = "CDC Criteria 2D"
 CDC_CRITERIA_2_COMBINED_FIELD = "CDC Criteria 2 (Combined)"
-
 
 # Criteria Category 3 Fields.
 MAX_ICU_BED_OCCUPATION_7_DAYS = "max_icu_bed_occupation_7_days"
@@ -142,6 +140,10 @@ CDC_CRITERIA_ALL_COMBINED_OR_FIELD = "cdc_criteria_all_combined_using_or"
 LAST_RAN_FIELD = "script_last_ran"
 LAST_UPDATED_FIELD = "data_last_changed"
 STATE_FIELD = "State"
+
+# Define a pre-formatted string to be used for CDC criteria positive and negative streak fields.
+CDC_CRITERIA_POSITIVE_STREAK_PRE_FORMAT = "{criteria_field} Positive Streak"
+CDC_CRITERIA_NEGATIVE_STREAK_PRE_FORMAT = "{criteria_field} Negative Streak"
 
 # Define the list of columns that should appear in the state summary tab.
 STATE_SUMMARY_COLUMNS = [
@@ -274,6 +276,7 @@ CRITERIA_6_SUMMARY_COLUMNS = [
 
 
 def transform_covidtracking_data(covidtracking_df):
+    """Transforms data from https://covidtracking.com/ and calculates CDC Criteria 1 (A, B, C, D) and 2 (A, B, C, D)."""
     # Rename state field into column called "State" instead of "state".
     covidtracking_df = covidtracking_df.rename(
         columns={STATE_SOURCE_FIELD: STATE_FIELD}
@@ -712,6 +715,35 @@ def transform_covidtracking_data(covidtracking_df):
             | covidtracking_df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
         ).values
 
+    # Calculate criteria streaks for Criteria 1 (A, B, C, D, Combined).
+    for criteria_field in [
+        CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD,
+        CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
+        CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
+        CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
+        CDC_CRITERIA_1_COMBINED_FIELD,
+    ]:
+        # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
+        positive_streak_series, negative_streak_series = calculate_cdc_criteria_positive_and_negative_streak_series(
+            criteria_series=covidtracking_df.loc[(state,), criteria_field]
+        )
+
+        # Add the positive streak series to the combined frame.
+        covidtracking_df.loc[
+            (state,),
+            CDC_CRITERIA_POSITIVE_STREAK_PRE_FORMAT.format(
+                criteria_field=criteria_field
+            ),
+        ] = positive_streak_series.values
+
+        # Add the negative streak series to the combined frame.
+        covidtracking_df.loc[
+            (state,),
+            CDC_CRITERIA_NEGATIVE_STREAK_PRE_FORMAT.format(
+                criteria_field=criteria_field
+            ),
+        ] = negative_streak_series.values
+
     # Add an update time.
     covidtracking_df[LAST_RAN_FIELD] = datetime.datetime.now()
 
@@ -740,6 +772,9 @@ def transform_covidtracking_data(covidtracking_df):
 
 
 def transform_cdc_ili_data(ili_df):
+    """Transforms data from https://gis.cdc.gov/grasp/fluview/fluportaldashboard.html and calculates CDC Criteria 5
+    (A, B, C).
+    """
     # Validate that the only region type is states to sanity check data.
     assert set(ili_df["REGION TYPE"].unique()) == {"States"}
 
@@ -877,6 +912,9 @@ def transform_cdc_ili_data(ili_df):
 
 
 def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
+    """Transforms data from https://www.cdc.gov/nhsn/covid19/report-patient-impact.html and calculates CDC Criteria 3
+    (A).
+    """
     # Add date to index
     cdc_df = pd.concat([cdc_beds_current_df, cdc_beds_historical_df], axis=0)
     cdc_df[DATE_SOURCE_FIELD] = pd.to_datetime(cdc_df[DATE_SOURCE_FIELD])
@@ -956,3 +994,17 @@ def indication_of_rebound(series_):
             indicator = "Rebound"
 
     return indicator
+
+
+def calculate_cdc_criteria_positive_and_negative_streak_series(criteria_series):
+    positive_streak_series = get_consecutive_positive_or_negative_values(
+        series_=(criteria_series.astype(bool).replace({False: -1, True: 1})),
+        positive_values=True,
+    )
+
+    negative_streak_series = get_consecutive_positive_or_negative_values(
+        series_=(criteria_series.astype(bool).replace({False: -1, True: 1})),
+        positive_values=False,
+    )
+
+    return positive_streak_series, negative_streak_series
