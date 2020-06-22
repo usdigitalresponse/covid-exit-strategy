@@ -13,6 +13,7 @@ from covid.transform import CRITERIA_1_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_2_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_3_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_5_SUMMARY_COLUMNS
+from covid.transform import CRITERIA_6_SUMMARY_COLUMNS
 from covid.transform import STATE_SUMMARY_COLUMNS
 from covid.transform import transform_cdc_beds_data
 from covid.transform import transform_cdc_ili_data
@@ -31,12 +32,15 @@ CDC_CRITERIA_1_GOOGLE_WORKBOOK_KEY = "1p4Z6zTa6O0ss5B5rgoWotAIwsBqqEqwdcM3Yel-mm
 CDC_CRITERIA_2_GOOGLE_WORKBOOK_KEY = "1xdePOZkXXv49_15YTloLr7D72eQhY9R-ZEhoMr-4UY0"
 CDC_CRITERIA_3_GOOGLE_WORKBOOK_KEY = "1-BSd5eFbNsypygMkhuGX1OWoUsF2u4chpsu6aC4cgVo"
 CDC_CRITERIA_5_GOOGLE_WORKBOOK_KEY = "1t9PbnAJBGKMBPPH-cwHxXca38ZVrkBrLhIBl6S66oFM"
+CDC_CRITERIA_6_GOOGLE_WORKBOOK_KEY = "1xhKoRK5GZBqor3Cn16K89ZtZGN9Iq93ShnsXCIqctK0"
 
 # Note: if you'd like to run the full pipeline, you'll need to generate a service account keyfile for an account
 # that has been given write access to the Google Sheet.
 
 
 def extract_transform_and_load_covid_data():
+    print("Starting to ETL...")
+
     client, credentials = get_sheets_client(
         credential_file_path=os.path.abspath(PATH_TO_SERVICE_ACCOUNT_KEY)
     )
@@ -121,6 +125,17 @@ def extract_transform_and_load_covid_data():
             transformed_df=transformed_cdc_ili_df, columns=CRITERIA_5_SUMMARY_COLUMNS
         ),
         workbook_key=CDC_CRITERIA_5_GOOGLE_WORKBOOK_KEY,
+        tab_name=STATE_SUMMARY_TAB_NAME,
+        credentials=credentials,
+    )
+
+    # Upload state summary tab for Criteria 6.
+    post_dataframe_to_google_sheets(
+        df=calculate_state_summary(
+            transformed_df=transformed_covidtracking_df,
+            columns=CRITERIA_6_SUMMARY_COLUMNS,
+        ),
+        workbook_key=CDC_CRITERIA_6_GOOGLE_WORKBOOK_KEY,
         tab_name=STATE_SUMMARY_TAB_NAME,
         credentials=credentials,
     )
