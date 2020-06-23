@@ -1,4 +1,5 @@
 import json
+import logging
 from io import BytesIO
 
 import pandas as pd
@@ -27,6 +28,8 @@ LAST_UPDATED_SOURCE_FIELD = "dateModified"
 # For bed utilization data
 CATEGORY_3_DATA_GOOGLE_SHEET_KEY = "1-BSd5eFbNsypygMkhuGX1OWoUsF2u4chpsu6aC4cgVo"
 CATEGORY_3_HISTORICAL_DATA_TAB = "Historical Data"
+
+logger = logging.getLogger(__name__)
 
 
 def extract_covidtracking_current_data():
@@ -68,10 +71,11 @@ def power_bi_extractor(response):
     timestamp = extract_cdc_data_date()
     value_list = data["results"][0]["result"]["data"]["dsr"]["DS"][0]["PH"][1]["DM1"]
     for vl in value_list:
-        yield vl["C"] + [timestamp]
-
-
-# CDC data source: https://www.cdc.gov/nhsn/covid19/report-patient-impact.html
+        data_row = vl["C"]
+        if len(data_row) == 3:
+            yield vl["C"] + [timestamp]
+        else:
+            logger.warning(f"Unexpected power BI response value: {data_row}")
 
 
 def extract_cdc_data_date():
