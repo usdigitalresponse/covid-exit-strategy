@@ -121,7 +121,8 @@ CDC_CRITERIA_5_COMBINED = "CDC Criteria 5 (Partially combined, 5A-5D)"
 # We choose 10 because that represents 9 weeks (63 days).
 PERCENT_ILI_NUM_LAGS = 10
 TOTAL_ILI_NUM_LAGS = 10
-
+# Criteria 6A requires <= 20%.
+CDC_CRITERIA_6A_MAX_PERCENT_THRESHOLD = 20
 
 # Criteria Category 6 Fields.
 PERCENT_POSITIVE_NEW_TESTS_NUM_LAGS = 61
@@ -693,7 +694,7 @@ def transform_covidtracking_data(covidtracking_df):
             covidtracking_df.loc[
                 (state,), MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3DCS_FIELD
             ]
-            <= 20
+            <= CDC_CRITERIA_6A_MAX_PERCENT_THRESHOLD
         ).values
 
         # Calculate all of the criteria combined.
@@ -719,8 +720,6 @@ def transform_covidtracking_data(covidtracking_df):
         (NEW_CASES_3DCS_FIELD, 121),
         (PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD, 31),
         (NEW_TESTS_TOTAL_3DCS_FIELD, 31),
-        # (PERCENT_POSITIVE_NEW_TESTS_FIELD, PERCENT_POSITIVE_NEW_TESTS_NUM_LAGS),
-        # (PERCENT_POSITIVE_NEW_TESTS_3D_FIELD, PERCENT_POSITIVE_NEW_TESTS_NUM_LAGS,),
     ]:
         lags = generate_lags(
             df=covidtracking_df, column=field_to_lag, num_lags=num_lags
