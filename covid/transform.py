@@ -867,6 +867,8 @@ def transform_cdc_ili_data(ili_df):
             right=lags, on=[STATE_FIELD, DATE_SOURCE_FIELD], how="left"
         )
 
+    ili_df[LAST_UPDATED_FIELD] = ili_df[DATE_SOURCE_FIELD]
+
     return ili_df
 
 
