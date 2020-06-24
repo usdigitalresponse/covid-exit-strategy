@@ -63,7 +63,8 @@ NEW_TESTS_TOTAL_3DCS_FIELD = "New Tests (3DCS)"
 POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD = "positive_tests_3_day_average"
 POSITIVE_TESTS_TOTAL_3DCS_FIELD = "positive_tests_3dcs"
 NEW_TESTS_TOTAL_DIFF_3DCS_FIELD = "new_tests_total_compared_to_yesterday_3dcs"
-PERCENT_POSITIVE_NEW_TESTS_FIELD = "percent_positive_new_tests"
+FRACTION_POSITIVE_NEW_TESTS_FIELD = "fraction_positive_new_tests"
+PERCENT_POSITIVE_NEW_TESTS_FIELD = "% Positive Tests"
 FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD = "Fraction Postive Tests (3DCS)"
 PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD = "% Positive Tests (3DCS)"
 PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD = (
@@ -120,6 +121,20 @@ CDC_CRITERIA_5_COMBINED = "CDC Criteria 5 (Partially combined, 5A-5D)"
 # We choose 10 because that represents 9 weeks (63 days).
 PERCENT_ILI_NUM_LAGS = 10
 TOTAL_ILI_NUM_LAGS = 10
+# Criteria 6A requires <= 20%.
+CDC_CRITERIA_6A_MAX_PERCENT_THRESHOLD = 20
+
+# Criteria Category 6 Fields.
+PERCENT_POSITIVE_NEW_TESTS_NUM_LAGS = 61
+MAX_PERCENT_POSITIVE_TESTS_14_DAYS_FIELD = "Highest % Positive (14 day window)"
+MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3DCS_FIELD = (
+    "Highest % Positive (14 day window, 3DCS)"
+)
+PERCENT_POSITIVE_NEW_TESTS_3D_FIELD = "% Positive (3-day average)"
+MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3D_FIELD = (
+    "Highest % Positive (14 day window, 3-day average)"
+)
+CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE = "CDC Criteria 6A"
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
@@ -213,6 +228,7 @@ CRITERIA_3_SUMMARY_COLUMNS = [
     CDC_CRITERIA_3_COMBINED_FIELD,
     INPATIENT_PERCENT_OCCUPIED,
     ICU_PERCENT_OCCUPIED,
+    LAST_UPDATED_FIELD,
 ]
 
 # Define the list of columns that should appear in summary workbooks.
@@ -238,6 +254,19 @@ CRITERIA_5_SUMMARY_COLUMNS = [
     CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
     CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI,
     CDC_CRITERIA_5_COMBINED,
+    LAST_UPDATED_FIELD,
+]
+
+
+CRITERIA_6_SUMMARY_COLUMNS = [
+    STATE_FIELD,
+    # Unpack all of the lag fields.
+    *percent_positive_3dcs_lag_fields,
+    # Repeat the T-0 field to serve as a spacer between sparklines.
+    MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3DCS_FIELD,
+    PERCENT_POSITIVE_NEW_TESTS_FIELD,
+    CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
+    LAST_UPDATED_FIELD,
 ]
 
 
@@ -514,7 +543,7 @@ def transform_covidtracking_data(covidtracking_df):
             smoothing_parameter=0.5,
         ).values
 
-        covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD] = (
+        covidtracking_df.loc[(state,), FRACTION_POSITIVE_NEW_TESTS_FIELD] = (
             covidtracking_df.loc[(state,), NEW_CASES_POSITIVE_SOURCE_FIELD].astype(
                 float
             )
@@ -625,6 +654,47 @@ def transform_covidtracking_data(covidtracking_df):
             | covidtracking_df.loc[
                 (state,), CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD
             ]
+        ).values
+
+        # Calculate Criteria 6A
+        covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD] = (
+            covidtracking_df.loc[(state,), FRACTION_POSITIVE_NEW_TESTS_FIELD] * 100
+        ).values
+
+        covidtracking_df.loc[(state,), MAX_PERCENT_POSITIVE_TESTS_14_DAYS_FIELD] = (
+            covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_FIELD]
+            .rolling("14D")
+            .max()
+            .values
+        )
+
+        covidtracking_df.loc[
+            (state,), MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3DCS_FIELD
+        ] = (
+            covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD]
+            .rolling("14D")
+            .max()
+            .values
+        )
+
+        covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3D_FIELD] = (
+            100
+            * covidtracking_df.loc[(state,), POSITIVE_TESTS_TOTAL_3_DAY_AVERAGE_FIELD]
+            / covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD]
+        ).values
+
+        covidtracking_df.loc[(state,), MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3D_FIELD] = (
+            covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3D_FIELD]
+            .rolling("14D")
+            .max()
+            .values
+        )
+
+        covidtracking_df.loc[(state,), CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE] = (
+            covidtracking_df.loc[
+                (state,), MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3DCS_FIELD
+            ]
+            <= CDC_CRITERIA_6A_MAX_PERCENT_THRESHOLD
         ).values
 
         # Calculate all of the criteria combined.
