@@ -922,6 +922,7 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
         state_dfs.append(state_df)
     combined_df = pd.concat(state_dfs, keys=states, names=[STATE_FIELD])
     combined_df = combined_df.reset_index(drop=False)
+    combined_df[LAST_UPDATED_FIELD] = combined_df[DATE_SOURCE_FIELD]
     return combined_df
 
 
