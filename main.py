@@ -71,12 +71,16 @@ def extract_transform_and_load_covid_data():
         credentials=credentials,
     )
 
+    time.sleep(20)
+
     post_dataframe_to_google_sheets(
         df=transformed_cdc_beds_df,
         workbook_key=CDC_CRITERIA_3_GOOGLE_WORKBOOK_KEY,
         tab_name="Historical Data",
         credentials=credentials,
     )
+
+    time.sleep(20)
 
     # Upload summary for all states.
     post_dataframe_to_google_sheets(
@@ -87,6 +91,8 @@ def extract_transform_and_load_covid_data():
         tab_name=STATE_SUMMARY_TAB_NAME,
         credentials=credentials,
     )
+
+    time.sleep(20)
 
     # Upload Criteria 1 workbook for all states.
     post_dataframe_to_google_sheets(
@@ -99,6 +105,8 @@ def extract_transform_and_load_covid_data():
         credentials=credentials,
     )
 
+    time.sleep(20)
+
     # Upload Criteria 2 workbook for all states.
     post_dataframe_to_google_sheets(
         df=calculate_state_summary(
@@ -110,6 +118,8 @@ def extract_transform_and_load_covid_data():
         credentials=credentials,
     )
 
+    time.sleep(20)
+
     # Upload Criteria 5 workbook
     # Upload all data tab for Criteria 5.
     post_dataframe_to_google_sheets(
@@ -118,6 +128,8 @@ def extract_transform_and_load_covid_data():
         tab_name=ALL_STATE_DATA_TAB_NAME,
         credentials=credentials,
     )
+
+    time.sleep(20)
 
     # Upload state summary tab for Criteria 5.
     post_dataframe_to_google_sheets(
@@ -128,6 +140,8 @@ def extract_transform_and_load_covid_data():
         tab_name=STATE_SUMMARY_TAB_NAME,
         credentials=credentials,
     )
+
+    time.sleep(20)
 
     # Upload state summary tab for Criteria 6.
     post_dataframe_to_google_sheets(

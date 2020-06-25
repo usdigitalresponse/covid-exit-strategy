@@ -139,7 +139,8 @@ CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE = "CDC Criteria 6A"
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
 CDC_CRITERIA_ALL_COMBINED_OR_FIELD = "cdc_criteria_all_combined_using_or"
-LAST_UPDATED_FIELD = "last_updated"
+LAST_RAN_FIELD = "script_last_ran"
+LAST_UPDATED_FIELD = "data_last_changed"
 STATE_FIELD = "State"
 
 # Define the list of columns that should appear in the state summary tab.
@@ -164,7 +165,7 @@ STATE_SUMMARY_COLUMNS = [
     CDC_CRITERIA_2_COMBINED_FIELD,
     CDC_CRITERIA_ALL_COMBINED_FIELD,
     CDC_CRITERIA_ALL_COMBINED_OR_FIELD,
-    LAST_UPDATED_FIELD,
+    LAST_RAN_FIELD,
 ]
 
 # Define the list of columns that should appear in summary workbooks.
@@ -188,7 +189,7 @@ CRITERIA_1_SUMMARY_COLUMNS = [
     CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
     CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
-    LAST_UPDATED_FIELD,
+    LAST_RAN_FIELD,
 ]
 
 (
@@ -217,7 +218,7 @@ CRITERIA_2_SUMMARY_COLUMNS = [
     CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD,
     CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
-    LAST_UPDATED_FIELD,
+    LAST_RAN_FIELD,
 ]
 
 CRITERIA_3_SUMMARY_COLUMNS = [
@@ -228,6 +229,7 @@ CRITERIA_3_SUMMARY_COLUMNS = [
     CDC_CRITERIA_3_COMBINED_FIELD,
     INPATIENT_PERCENT_OCCUPIED,
     ICU_PERCENT_OCCUPIED,
+    LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
 
@@ -254,6 +256,7 @@ CRITERIA_5_SUMMARY_COLUMNS = [
     CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
     CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI,
     CDC_CRITERIA_5_COMBINED,
+    LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
 
@@ -266,7 +269,7 @@ CRITERIA_6_SUMMARY_COLUMNS = [
     MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3DCS_FIELD,
     PERCENT_POSITIVE_NEW_TESTS_FIELD,
     CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
-    LAST_UPDATED_FIELD,
+    LAST_RAN_FIELD,
 ]
 
 
@@ -710,7 +713,7 @@ def transform_covidtracking_data(covidtracking_df):
         ).values
 
     # Add an update time.
-    covidtracking_df[LAST_UPDATED_FIELD] = datetime.datetime.now()
+    covidtracking_df[LAST_RAN_FIELD] = datetime.datetime.now()
 
     # Remove the multi-index, converting date and state back to just columns.
     covidtracking_df = covidtracking_df.reset_index(drop=False)
@@ -868,6 +871,7 @@ def transform_cdc_ili_data(ili_df):
         )
 
     ili_df[LAST_UPDATED_FIELD] = ili_df[DATE_SOURCE_FIELD]
+    ili_df[LAST_RAN_FIELD] = datetime.datetime.now()
 
     return ili_df
 
@@ -885,15 +889,18 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
     # Drop nan-index data.
     cdc_df = cdc_df.loc[cdc_df.index.dropna()]
 
+    # Replace empty data with None
+    cdc_df[ICU_PERCENT_OCCUPIED] = (
+        cdc_df[ICU_PERCENT_OCCUPIED].astype(str).replace("", None)
+    )
+    cdc_df[INPATIENT_PERCENT_OCCUPIED] = (
+        cdc_df[INPATIENT_PERCENT_OCCUPIED].astype(str).replace("", None)
+    )
+
     # Convert data from str to float
     cdc_df[INPATIENT_PERCENT_OCCUPIED] = cdc_df[INPATIENT_PERCENT_OCCUPIED].astype(
         float
     )
-
-    cdc_df[ICU_PERCENT_OCCUPIED] = (
-        cdc_df[ICU_PERCENT_OCCUPIED].astype(str).replace("", None)
-    )
-
     cdc_df[ICU_PERCENT_OCCUPIED] = cdc_df[ICU_PERCENT_OCCUPIED].astype(float)
 
     cdc_df = cdc_df.sort_index()  # ascending date and state
@@ -932,6 +939,7 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
     )
     combined_df = combined_df.reset_index(drop=False)
     combined_df[LAST_UPDATED_FIELD] = combined_df[DATE_SOURCE_FIELD]
+    combined_df[LAST_RAN_FIELD] = datetime.datetime.now()
     return combined_df
 
 
