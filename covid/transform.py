@@ -923,6 +923,13 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
         ]
         state_dfs.append(state_df)
     combined_df = pd.concat(state_dfs, keys=states, names=[STATE_FIELD])
+
+    # Reindex so gaps are NaN instead of missing
+    unique_dates = combined_df.index.get_level_values(level=DATE_SOURCE_FIELD).unique()
+    unique_states = combined_df.index.get_level_values(level=STATE_FIELD).unique()
+    combined_df = combined_df.reindex(
+        pd.MultiIndex.from_product([unique_states, unique_dates])
+    )
     combined_df = combined_df.reset_index(drop=False)
     combined_df[LAST_UPDATED_FIELD] = combined_df[DATE_SOURCE_FIELD]
     return combined_df
