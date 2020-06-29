@@ -23,6 +23,11 @@ that Google service account and save it as `service-account-key.json` in the roo
 Next, add the "email address" of your service account to have permissions to the [Data Sources](https://drive.google.com/drive/u/1/folders/15j1iyyJtJ8BmK3y-HO6cLp-7R7nAoSml)
 folder of the Google Drive through the user interface which looks like this:
 
+Finally, make sure that the Google Sheets and Drive APIs are enabled it your service account's project. Go to these links:
+https://console.developers.google.com/apis/library/sheets.googleapis.com?project=<project_id> and
+https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=<project_id>, replacing `<project_id>`
+with your project ID, to enable the Google Sheets and Drive APIs.
+
 ![google sharing example](google_sharing_example.png)
 
 As you start your work you may choose to set your service account permissions for read-only until you're ready to post
