@@ -200,4 +200,5 @@ def extract_cdc_beds_historical_data(credentials):
         col_names=True,
     )
     cdc_historical_df = cdc_historical_df.set_index(STATE_FIELD)
+
     return cdc_historical_df
