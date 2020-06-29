@@ -146,8 +146,8 @@ STATE_FIELD = "State"
 CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT = "{criteria_field} Positive Streak"
 CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT = "{criteria_field} Negative Streak"
 
-# Define the list of CDC criteria fields that should have streak fields appear in the state summary tab.
-_CDC_CRITERIA_STREAK_STATE_SUMMARY_FIELDS = [
+# Define the list of CDC Criteria 1 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_1_STREAK_STATE_SUMMARY_FIELDS = [
     CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD,
     CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
     CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
@@ -155,16 +155,95 @@ _CDC_CRITERIA_STREAK_STATE_SUMMARY_FIELDS = [
     CDC_CRITERIA_1_COMBINED_FIELD,
 ]
 
-# Define the list of positive criteria streak fields that should appear in the state summary tab.
-CDC_CRITERIA_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
-    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
-    for criteria_field in _CDC_CRITERIA_STREAK_STATE_SUMMARY_FIELDS
+# Define the list of CDC Criteria 2 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_2_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD,
+    CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD,
+    CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
+    CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
+    CDC_CRITERIA_2_COMBINED_FIELD,
 ]
 
-# Define the list of negative criteria streak fields that should appear in the state summary tab.
-CDC_CRITERIA_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+# Define the list of CDC Criteria 3 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_3_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD,
+    CDC_CRITERIA_3_COMBINED_FIELD,
+]
+
+# Define the list of CDC Criteria 5 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_5_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI,
+    CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI,
+    CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
+    CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI,
+    CDC_CRITERIA_5_COMBINED,
+]
+
+# Define the list of CDC Criteria 6 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_6_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
+    CDC_CRITERIA_6A_MAX_PERCENT_THRESHOLD,
+]
+
+
+# Define the list of CDC Criteria 1 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_1_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_1_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 1 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_1_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
     CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
-    for criteria_field in _CDC_CRITERIA_STREAK_STATE_SUMMARY_FIELDS
+    for criteria_field in _CDC_CRITERIA_1_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 2 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_2_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_2_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 2 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_2_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_2_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 3 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_3_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_3_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 3 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_3_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_3_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 5 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_5_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_5_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 5 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_5_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_5_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 6 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_6_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_6_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 6 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_6_STREAK_STATE_SUMMARY_FIELDS
 ]
 
 
@@ -188,8 +267,9 @@ STATE_SUMMARY_COLUMNS = [
     CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
     CDC_CRITERIA_2_COMBINED_FIELD,
-    *CDC_CRITERIA_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
-    *CDC_CRITERIA_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
+    # Add streak fields.
+    *CDC_CRITERIA_1_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_1_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     CDC_CRITERIA_ALL_COMBINED_FIELD,
     CDC_CRITERIA_ALL_COMBINED_OR_FIELD,
     LAST_RAN_FIELD,
@@ -216,7 +296,11 @@ CRITERIA_1_SUMMARY_COLUMNS = [
     CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
     CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
+    # Add streak fields.
+    *CDC_CRITERIA_1_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_1_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
+    LAST_UPDATED_FIELD,
 ]
 
 (
@@ -245,8 +329,13 @@ CRITERIA_2_SUMMARY_COLUMNS = [
     CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD,
     CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
+    # Add streak fields.
+    *CDC_CRITERIA_2_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_2_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
+    LAST_UPDATED_FIELD,
 ]
+
 
 CRITERIA_3_SUMMARY_COLUMNS = [
     STATE_FIELD,
@@ -256,6 +345,9 @@ CRITERIA_3_SUMMARY_COLUMNS = [
     CDC_CRITERIA_3_COMBINED_FIELD,
     INPATIENT_PERCENT_OCCUPIED,
     ICU_PERCENT_OCCUPIED,
+    # Add streak fields.
+    *CDC_CRITERIA_3_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_3_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
@@ -283,6 +375,9 @@ CRITERIA_5_SUMMARY_COLUMNS = [
     CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
     CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI,
     CDC_CRITERIA_5_COMBINED,
+    # Add streak fields.
+    *CDC_CRITERIA_5_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_5_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
@@ -296,7 +391,11 @@ CRITERIA_6_SUMMARY_COLUMNS = [
     MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3DCS_FIELD,
     PERCENT_POSITIVE_NEW_TESTS_FIELD,
     CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
+    # Add streak fields.
+    *CDC_CRITERIA_6_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
+    LAST_UPDATED_FIELD,
 ]
 
 
