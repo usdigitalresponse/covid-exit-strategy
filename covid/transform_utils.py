@@ -68,7 +68,7 @@ def fit_and_predict_cubic_spline_in_r(
     return predicted_spline_series
 
 
-def get_consecutive_positive_or_negative_values(series_, positive_values=True):
+def calculate_consecutive_positive_or_negative_values(series_, positive_values=True):
     meets_criteria = series_ > 0 if positive_values else series_ < 0
     consecutive_positive_values = meets_criteria * (
         meets_criteria.groupby(
@@ -79,7 +79,7 @@ def get_consecutive_positive_or_negative_values(series_, positive_values=True):
     return consecutive_positive_values
 
 
-def get_max_run_in_window(series_, positive_values, window_size=14):
+def calculate_max_run_in_window(series_, positive_values, window_size=14):
     # Assert that the index is sorted.
     if not series_.index.is_monotonic_increasing:
         raise ValueError("Index is not sorted.")
@@ -90,7 +90,7 @@ def get_max_run_in_window(series_, positive_values, window_size=14):
         # Start calculating the run of values that happened *within (and only within)* this window.
         # TODO(lbrown): this is incredibly inefficient, but I can't think of a faster way while following the right
         #  interpretation of the rules.
-        consecutive_positive_or_negative_values = get_consecutive_positive_or_negative_values(
+        consecutive_positive_or_negative_values = calculate_consecutive_positive_or_negative_values(
             series_=series_.iloc[i + 1 - window_size : i + 1],
             positive_values=positive_values,
         )
@@ -165,3 +165,18 @@ def calculate_state_summary(transformed_df, columns):
     ]
 
     return state_summary_df
+
+
+def calculate_consecutive_boolean_series(boolean_series):
+    """Calculates the number of consecutive booleans (`True` / `False`) in the given boolean series."""
+    consecutive_true_series = calculate_consecutive_positive_or_negative_values(
+        series_=(boolean_series.astype(bool).replace({False: -1, True: 1})),
+        positive_values=True,
+    )
+
+    consecutive_false_series = calculate_consecutive_positive_or_negative_values(
+        series_=(boolean_series.astype(bool).replace({False: -1, True: 1})),
+        positive_values=False,
+    )
+
+    return consecutive_true_series, consecutive_false_series

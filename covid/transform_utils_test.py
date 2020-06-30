@@ -5,32 +5,34 @@ import numpy as np
 import pandas as pd
 from pandas.testing import assert_series_equal
 
+from covid.transform_utils import calculate_consecutive_boolean_series
+from covid.transform_utils import calculate_consecutive_positive_or_negative_values
+from covid.transform_utils import calculate_max_run_in_window
 from covid.transform_utils import fit_and_predict_cubic_spline
 from covid.transform_utils import fit_and_predict_cubic_spline_in_r
-from covid.transform_utils import get_consecutive_positive_or_negative_values
-from covid.transform_utils import get_max_run_in_window
 
 
 class TransformUtilsTest(unittest.TestCase):
-    def test_find_consecutive_positive_values(self):
+    def test_find_consecutive_positive_or_negative_values(self):
         assert_series_equal(
-            get_consecutive_positive_or_negative_values(
+            calculate_consecutive_positive_or_negative_values(
                 series_=pd.Series([-1, 1, 2, -4, 3, 5]), positive_values=True
             ),
             pd.Series([0, 1, 2, 0, 1, 2]),
         )
 
+        # Note: Zero is not counted as a positive value.
         assert_series_equal(
-            get_consecutive_positive_or_negative_values(
+            calculate_consecutive_positive_or_negative_values(
                 series_=pd.Series([-1, -1, 0, 1, 2, 3, -15, -17.0]),
                 positive_values=True,
             ),
-            pd.Series([0, 0, 1, 2, 3, 4, 0, 0]),
+            pd.Series([0, 0, 0, 1, 2, 3, 0, 0]),
         )
 
         # Make sure we handle null values appropriately.
         assert_series_equal(
-            get_consecutive_positive_or_negative_values(
+            calculate_consecutive_positive_or_negative_values(
                 series_=pd.Series([np.nan, 1, 2, -4, np.nan, 5]), positive_values=True
             ),
             pd.Series([0, 1, 2, 0, 0, 1]),
@@ -38,7 +40,7 @@ class TransformUtilsTest(unittest.TestCase):
 
         # Make sure we handle null values appropriately.
         assert_series_equal(
-            get_consecutive_positive_or_negative_values(
+            calculate_consecutive_positive_or_negative_values(
                 series_=pd.Series([np.nan, np.nan, 2, 4, np.nan, 5]),
                 positive_values=True,
             ),
@@ -47,14 +49,14 @@ class TransformUtilsTest(unittest.TestCase):
 
         # Now, test for negative values.
         assert_series_equal(
-            get_consecutive_positive_or_negative_values(
+            calculate_consecutive_positive_or_negative_values(
                 series_=pd.Series([-1, 1, 2, -4, 3, 5]), positive_values=False
             ),
             pd.Series([1, 0, 0, 1, 0, 0]),
         )
 
         assert_series_equal(
-            get_consecutive_positive_or_negative_values(
+            calculate_consecutive_positive_or_negative_values(
                 series_=pd.Series([-1, -1, -2, 0, -7, 5]), positive_values=False
             ),
             pd.Series([1, 2, 3, 0, 1, 0]),
@@ -258,7 +260,7 @@ class TransformUtilsTest(unittest.TestCase):
     def test_get_max_run_in_window(self):
         # A very simple series.
         assert_series_equal(
-            get_max_run_in_window(
+            calculate_max_run_in_window(
                 positive_values=True,
                 window_size=3,
                 series_=pd.Series(
@@ -299,7 +301,7 @@ class TransformUtilsTest(unittest.TestCase):
         )
 
         assert_series_equal(
-            get_max_run_in_window(
+            calculate_max_run_in_window(
                 positive_values=True,
                 window_size=3,
                 series_=pd.Series(
@@ -340,7 +342,7 @@ class TransformUtilsTest(unittest.TestCase):
         )
 
         assert_series_equal(
-            get_max_run_in_window(
+            calculate_max_run_in_window(
                 positive_values=False,
                 window_size=3,
                 series_=pd.Series(
@@ -381,7 +383,7 @@ class TransformUtilsTest(unittest.TestCase):
         )
 
         assert_series_equal(
-            get_max_run_in_window(
+            calculate_max_run_in_window(
                 positive_values=True,
                 series_=pd.Series(
                     data=[
@@ -510,6 +512,63 @@ class TransformUtilsTest(unittest.TestCase):
                         pd.to_datetime("2020-01-26"),
                         pd.to_datetime("2020-01-27"),
                         pd.to_datetime("2020-01-28"),
+                    ],
+                    freq=datetime.timedelta(days=1),
+                ),
+            ),
+        )
+
+    def test_calculate_consecutive_boolean_series(self):
+        consecutive_true_series, consecutive_false_series = calculate_consecutive_boolean_series(
+            boolean_series=pd.Series(
+                data=[True, True, False, True, False, False, False],
+                index=pd.DatetimeIndex(
+                    data=[
+                        pd.to_datetime("2020-01-01"),
+                        pd.to_datetime("2020-01-02"),
+                        pd.to_datetime("2020-01-03"),
+                        pd.to_datetime("2020-01-04"),
+                        pd.to_datetime("2020-01-05"),
+                        pd.to_datetime("2020-01-06"),
+                        pd.to_datetime("2020-01-07"),
+                    ],
+                    freq=datetime.timedelta(days=1),
+                ),
+            )
+        )
+
+        assert_series_equal(
+            consecutive_true_series,
+            pd.Series(
+                data=[1, 2, 0, 1, 0, 0, 0],
+                index=pd.DatetimeIndex(
+                    data=[
+                        pd.to_datetime("2020-01-01"),
+                        pd.to_datetime("2020-01-02"),
+                        pd.to_datetime("2020-01-03"),
+                        pd.to_datetime("2020-01-04"),
+                        pd.to_datetime("2020-01-05"),
+                        pd.to_datetime("2020-01-06"),
+                        pd.to_datetime("2020-01-07"),
+                    ],
+                    freq=datetime.timedelta(days=1),
+                ),
+            ),
+        )
+
+        assert_series_equal(
+            consecutive_false_series,
+            pd.Series(
+                data=[0, 0, 1, 0, 1, 2, 3],
+                index=pd.DatetimeIndex(
+                    data=[
+                        pd.to_datetime("2020-01-01"),
+                        pd.to_datetime("2020-01-02"),
+                        pd.to_datetime("2020-01-03"),
+                        pd.to_datetime("2020-01-04"),
+                        pd.to_datetime("2020-01-05"),
+                        pd.to_datetime("2020-01-06"),
+                        pd.to_datetime("2020-01-07"),
                     ],
                     freq=datetime.timedelta(days=1),
                 ),

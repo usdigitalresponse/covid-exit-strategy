@@ -9,11 +9,12 @@ from covid.extract import NEW_CASES_NEGATIVE_SOURCE_FIELD
 from covid.extract import NEW_CASES_POSITIVE_SOURCE_FIELD
 from covid.extract import STATE_SOURCE_FIELD
 from covid.extract import TOTAL_CASES_SOURCE_FIELD
+from covid.transform_utils import calculate_consecutive_boolean_series
+from covid.transform_utils import calculate_consecutive_positive_or_negative_values
+from covid.transform_utils import calculate_max_run_in_window
 from covid.transform_utils import fit_and_predict_cubic_spline_in_r
 from covid.transform_utils import generate_lag_column_name_formatter_and_column_names
 from covid.transform_utils import generate_lags
-from covid.transform_utils import get_consecutive_positive_or_negative_values
-from covid.transform_utils import get_max_run_in_window
 
 
 # Define output field names.
@@ -55,7 +56,6 @@ CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD = "CDC Criteria 1C"
 CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE = "CDC Criteria 1D"
 CDC_CRITERIA_1_COMBINED_FIELD = "CDC Criteria 1 (Combined)"
 
-
 # Criteria Category 2 Fields.
 NEW_TESTS_TOTAL_FIELD = "new_tests_total"
 NEW_TESTS_TOTAL_3_DAY_AVERAGE_FIELD = "new_tests_total_3_day_average"
@@ -83,7 +83,6 @@ CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD = "CDC Criteria 2B"
 CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD = "CDC Criteria 2C"
 CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD = "CDC Criteria 2D"
 CDC_CRITERIA_2_COMBINED_FIELD = "CDC Criteria 2 (Combined)"
-
 
 # Criteria Category 3 Fields.
 MAX_ICU_BED_OCCUPATION_7_DAYS = "max_icu_bed_occupation_7_days"
@@ -143,6 +142,111 @@ LAST_RAN_FIELD = "script_last_ran"
 LAST_UPDATED_FIELD = "data_last_changed"
 STATE_FIELD = "State"
 
+# Define a pre-formatted string to be used for CDC criteria positive and negative streak fields.
+CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT = "{criteria_field} Positive Streak"
+CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT = "{criteria_field} Negative Streak"
+
+# Define the list of CDC Criteria 1 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_1_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD,
+    CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
+    CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
+    CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
+    CDC_CRITERIA_1_COMBINED_FIELD,
+]
+
+# Define the list of CDC Criteria 2 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_2_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD,
+    CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD,
+    CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
+    CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
+    CDC_CRITERIA_2_COMBINED_FIELD,
+]
+
+# Define the list of CDC Criteria 3 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_3_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD,
+    CDC_CRITERIA_3_COMBINED_FIELD,
+]
+
+# Define the list of CDC Criteria 5 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_5_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI,
+    CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI,
+    CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
+    CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI,
+    CDC_CRITERIA_5_COMBINED,
+]
+
+# Define the list of CDC Criteria 6 fields that should have streak fields appear in the state summary tab.
+_CDC_CRITERIA_6_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
+    CDC_CRITERIA_6A_MAX_PERCENT_THRESHOLD,
+]
+
+
+# Define the list of CDC Criteria 1 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_1_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_1_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 1 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_1_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_1_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 2 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_2_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_2_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 2 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_2_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_2_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 3 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_3_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_3_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 3 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_3_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_3_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 5 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_5_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_5_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 5 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_5_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_5_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 6 positive streak fields that should appear in the state summary tab.
+CDC_CRITERIA_6_POSITIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_6_STREAK_STATE_SUMMARY_FIELDS
+]
+
+# Define the list of CDC Criteria 6 negative streak fields that should appear in the state summary tab.
+CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
+    CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(criteria_field=criteria_field)
+    for criteria_field in _CDC_CRITERIA_6_STREAK_STATE_SUMMARY_FIELDS
+]
+
+
 # Define the list of columns that should appear in the state summary tab.
 STATE_SUMMARY_COLUMNS = [
     STATE_FIELD,
@@ -163,6 +267,9 @@ STATE_SUMMARY_COLUMNS = [
     CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
     CDC_CRITERIA_2_COMBINED_FIELD,
+    # Add streak fields.
+    *CDC_CRITERIA_1_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_1_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     CDC_CRITERIA_ALL_COMBINED_FIELD,
     CDC_CRITERIA_ALL_COMBINED_OR_FIELD,
     LAST_RAN_FIELD,
@@ -189,7 +296,11 @@ CRITERIA_1_SUMMARY_COLUMNS = [
     CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
     CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
+    # Add streak fields.
+    *CDC_CRITERIA_1_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_1_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
+    LAST_UPDATED_FIELD,
 ]
 
 (
@@ -218,8 +329,13 @@ CRITERIA_2_SUMMARY_COLUMNS = [
     CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD,
     CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
     CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
+    # Add streak fields.
+    *CDC_CRITERIA_2_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_2_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
+    LAST_UPDATED_FIELD,
 ]
+
 
 CRITERIA_3_SUMMARY_COLUMNS = [
     STATE_FIELD,
@@ -229,6 +345,9 @@ CRITERIA_3_SUMMARY_COLUMNS = [
     CDC_CRITERIA_3_COMBINED_FIELD,
     INPATIENT_PERCENT_OCCUPIED,
     ICU_PERCENT_OCCUPIED,
+    # Add streak fields.
+    *CDC_CRITERIA_3_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_3_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
@@ -256,6 +375,9 @@ CRITERIA_5_SUMMARY_COLUMNS = [
     CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
     CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI,
     CDC_CRITERIA_5_COMBINED,
+    # Add streak fields.
+    *CDC_CRITERIA_5_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_5_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
@@ -269,11 +391,16 @@ CRITERIA_6_SUMMARY_COLUMNS = [
     MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3DCS_FIELD,
     PERCENT_POSITIVE_NEW_TESTS_FIELD,
     CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
+    # Add streak fields.
+    *CDC_CRITERIA_6_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
+    LAST_UPDATED_FIELD,
 ]
 
 
 def transform_covidtracking_data(covidtracking_df):
+    """Transforms data from https://covidtracking.com/ and calculates CDC Criteria 1 (A, B, C, D) and 2 (A, B, C, D)."""
     # Rename state field into column called "State" instead of "state".
     covidtracking_df = covidtracking_df.rename(
         columns={STATE_SOURCE_FIELD: STATE_FIELD}
@@ -359,14 +486,14 @@ def transform_covidtracking_data(covidtracking_df):
         # Calculate consecutive increases or decreases.
         covidtracking_df.loc[
             (state,), CONSECUTIVE_INCREASE_NEW_CASES_3DCS_FIELD
-        ] = get_consecutive_positive_or_negative_values(
+        ] = calculate_consecutive_positive_or_negative_values(
             series_=covidtracking_df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
             positive_values=True,
         ).values
 
         covidtracking_df.loc[
             (state,), CONSECUTIVE_DECREASE_NEW_CASES_3DCS_FIELD
-        ] = get_consecutive_positive_or_negative_values(
+        ] = calculate_consecutive_positive_or_negative_values(
             series_=covidtracking_df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
             positive_values=False,
         ).values
@@ -374,7 +501,7 @@ def transform_covidtracking_data(covidtracking_df):
         # Calculate criteria 1A: must see at least 9 days of a decrease in new cases over a 14 day window.
         covidtracking_df.loc[
             (state,), MAX_RUN_OF_DECREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
-        ] = get_max_run_in_window(
+        ] = calculate_max_run_in_window(
             series_=covidtracking_df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
             positive_values=False,
             window_size=14,
@@ -392,7 +519,7 @@ def transform_covidtracking_data(covidtracking_df):
         # Calculate criteria 1B: must not see 5 or more days of an increase in new cases over a 14 day window.
         covidtracking_df.loc[
             (state,), MAX_RUN_OF_INCREASING_NEW_CASES_IN_14_DAY_WINDOW_3DCS_FIELD
-        ] = get_max_run_in_window(
+        ] = calculate_max_run_in_window(
             series_=covidtracking_df.loc[(state,), NEW_CASES_3DCS_DIFF_FIELD],
             positive_values=True,
             window_size=14,
@@ -575,7 +702,7 @@ def transform_covidtracking_data(covidtracking_df):
         # consecutive days of increasing or stable percent positive allowed as a grace period if data are inconsistent.
         covidtracking_df.loc[
             (state,), MAX_RUN_OF_DECREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD
-        ] = get_max_run_in_window(
+        ] = calculate_max_run_in_window(
             series_=covidtracking_df.loc[
                 (state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD
             ],
@@ -585,7 +712,7 @@ def transform_covidtracking_data(covidtracking_df):
 
         covidtracking_df.loc[
             (state,), MAX_RUN_OF_INCREASING_PERCENT_POSITIVE_TESTS_3DCS_FIELD
-        ] = get_max_run_in_window(
+        ] = calculate_max_run_in_window(
             series_=covidtracking_df.loc[
                 (state,), PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD
             ],
@@ -611,7 +738,7 @@ def transform_covidtracking_data(covidtracking_df):
 
         covidtracking_df.loc[
             (state,), MAX_RUN_OF_INCREASING_TOTAL_TESTS_3DCS_FIELD
-        ] = get_max_run_in_window(
+        ] = calculate_max_run_in_window(
             series_=covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_DIFF_3DCS_FIELD],
             window_size=14,
             positive_values=False,
@@ -712,6 +839,40 @@ def transform_covidtracking_data(covidtracking_df):
             | covidtracking_df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
         ).values
 
+        # Calculate criteria streaks for Criteria 1 (A, B, C, D, Combined) and Criteria 2 (A, B, C, D, Combined).
+        for criteria_field in [
+            CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD,
+            CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
+            CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
+            CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
+            CDC_CRITERIA_1_COMBINED_FIELD,
+            CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD,
+            CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD,
+            CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
+            CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
+            CDC_CRITERIA_2_COMBINED_FIELD,
+        ]:
+            # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
+            positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
+                boolean_series=covidtracking_df.loc[(state,), criteria_field]
+            )
+
+            # Add the positive streak series to the combined frame.
+            covidtracking_df.loc[
+                (state,),
+                CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(
+                    criteria_field=criteria_field
+                ),
+            ] = positive_streak_series.values
+
+            # Add the negative streak series to the combined frame.
+            covidtracking_df.loc[
+                (state,),
+                CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(
+                    criteria_field=criteria_field
+                ),
+            ] = negative_streak_series.values
+
     # Add an update time.
     covidtracking_df[LAST_RAN_FIELD] = datetime.datetime.now()
 
@@ -740,6 +901,9 @@ def transform_covidtracking_data(covidtracking_df):
 
 
 def transform_cdc_ili_data(ili_df):
+    """Transforms data from https://gis.cdc.gov/grasp/fluview/fluportaldashboard.html and calculates CDC Criteria 5
+    (A, B, C).
+    """
     # Validate that the only region type is states to sanity check data.
     assert set(ili_df["REGION TYPE"].unique()) == {"States"}
 
@@ -805,7 +969,7 @@ def transform_cdc_ili_data(ili_df):
         # Calculate criteria 5A: must see two consecutive declines in weekly total ILI data.
         ili_df.loc[
             (state,), MAX_RUN_OF_DECREASING_TOTAL_ILI_SPLINE_DIFF
-        ] = get_max_run_in_window(
+        ] = calculate_max_run_in_window(
             series_=ili_df.loc[(state,), TOTAL_ILI_SPLINE_DIFF],
             positive_values=False,
             window_size=2,
@@ -826,7 +990,7 @@ def transform_cdc_ili_data(ili_df):
         # Calculate criteria 5C: must see two consecutive declines in weekly percent ILI data.
         ili_df.loc[
             (state,), MAX_RUN_OF_DECREASING_PERCENT_ILI_SPLINE_DIFF
-        ] = get_max_run_in_window(
+        ] = calculate_max_run_in_window(
             series_=ili_df.loc[(state,), PERCENT_ILI_SPLINE_DIFF],
             positive_values=False,
             window_size=2,
@@ -851,6 +1015,35 @@ def transform_cdc_ili_data(ili_df):
             & ili_df.loc[(state,), CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI]
             & ili_df.loc[(state,), CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI]
         ).values
+
+        # Calculate criteria streaks for Criteria 5 (A, B, C, D, Combined).
+        for criteria_field in [
+            CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI,
+            CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI,
+            CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
+            CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI,
+            CDC_CRITERIA_5_COMBINED,
+        ]:
+            # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
+            positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
+                boolean_series=ili_df.loc[(state,), criteria_field]
+            )
+
+            # Add the positive streak series to the combined frame.
+            ili_df.loc[
+                (state,),
+                CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(
+                    criteria_field=criteria_field
+                ),
+            ] = positive_streak_series.values
+
+            # Add the negative streak series to the combined frame.
+            ili_df.loc[
+                (state,),
+                CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(
+                    criteria_field=criteria_field
+                ),
+            ] = negative_streak_series.values
 
     # Remove the multi-index, converting date and state back to just columns.
     ili_df = ili_df.reset_index(drop=False)
@@ -877,6 +1070,9 @@ def transform_cdc_ili_data(ili_df):
 
 
 def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
+    """Transforms data from https://www.cdc.gov/nhsn/covid19/report-patient-impact.html and calculates CDC Criteria 3
+    (A).
+    """
     # Add date to index
     cdc_df = pd.concat([cdc_beds_current_df, cdc_beds_historical_df], axis=0)
     cdc_df[DATE_SOURCE_FIELD] = pd.to_datetime(cdc_df[DATE_SOURCE_FIELD])
@@ -928,7 +1124,35 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
         state_df[CDC_CRITERIA_3_COMBINED_FIELD] = state_df[
             CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD
         ]
+
+        # Calculate criteria streaks for Criteria 5 (A, B, C, D, Combined).
+        for criteria_field in [
+            CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD,
+            CDC_CRITERIA_3_COMBINED_FIELD,
+        ]:
+            # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
+            positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
+                boolean_series=state_df.loc[(state,), criteria_field]
+            )
+
+            # Add the positive streak series to the combined frame.
+            state_df.loc[
+                (state,),
+                CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(
+                    criteria_field=criteria_field
+                ),
+            ] = positive_streak_series.values
+
+            # Add the negative streak series to the combined frame.
+            state_df.loc[
+                (state,),
+                CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(
+                    criteria_field=criteria_field
+                ),
+            ] = negative_streak_series.values
+
         state_dfs.append(state_df)
+
     combined_df = pd.concat(state_dfs, keys=states, names=[STATE_FIELD])
 
     # Reindex so gaps are NaN instead of missing
