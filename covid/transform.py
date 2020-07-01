@@ -1132,23 +1132,21 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
         ]:
             # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
             positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
-                boolean_series=state_df.loc[(state,), criteria_field]
+                boolean_series=state_df[criteria_field]
             )
 
             # Add the positive streak series to the combined frame.
-            state_df.loc[
-                (state,),
+            state_df[
                 CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(
                     criteria_field=criteria_field
-                ),
+                )
             ] = positive_streak_series.values
 
             # Add the negative streak series to the combined frame.
-            state_df.loc[
-                (state,),
+            state_df[
                 CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(
                     criteria_field=criteria_field
-                ),
+                )
             ] = negative_streak_series.values
 
         state_dfs.append(state_df)
