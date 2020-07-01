@@ -392,10 +392,10 @@ CRITERIA_6_SUMMARY_COLUMNS = [
     PERCENT_POSITIVE_NEW_TESTS_FIELD,
     CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
     # Add streak fields.
-    *CDC_CRITERIA_6_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
-    *CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
+    # *CDC_CRITERIA_6_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    # *CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
     LAST_RAN_FIELD,
-    LAST_UPDATED_FIELD,
+    # TODO (pjsheehan): add this in when it's supported LAST_UPDATED_FIELD,
 ]
 
 
@@ -853,7 +853,10 @@ def transform_covidtracking_data(covidtracking_df):
             CDC_CRITERIA_2_COMBINED_FIELD,
         ]:
             # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
-            positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
+            (
+                positive_streak_series,
+                negative_streak_series,
+            ) = calculate_consecutive_boolean_series(
                 boolean_series=covidtracking_df.loc[(state,), criteria_field]
             )
 
@@ -878,6 +881,9 @@ def transform_covidtracking_data(covidtracking_df):
 
     # Remove the multi-index, converting date and state back to just columns.
     covidtracking_df = covidtracking_df.reset_index(drop=False)
+
+    # Use the date for each data entry as when the data were last updated.
+    covidtracking_df[LAST_UPDATED_FIELD] = covidtracking_df[DATE_SOURCE_FIELD]
 
     # Join to lags of important variables that we want to plot in sparklines.
     for field_to_lag, num_lags in [
@@ -1025,7 +1031,10 @@ def transform_cdc_ili_data(ili_df):
             CDC_CRITERIA_5_COMBINED,
         ]:
             # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
-            positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
+            (
+                positive_streak_series,
+                negative_streak_series,
+            ) = calculate_consecutive_boolean_series(
                 boolean_series=ili_df.loc[(state,), criteria_field]
             )
 
@@ -1131,13 +1140,16 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
             CDC_CRITERIA_3_COMBINED_FIELD,
         ]:
             # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
-            positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
-                boolean_series=state_df.loc[(state,), criteria_field]
+            (
+                positive_streak_series,
+                negative_streak_series,
+            ) = calculate_consecutive_boolean_series(
+                boolean_series=state_df.loc[:, criteria_field]
             )
 
             # Add the positive streak series to the combined frame.
             state_df.loc[
-                (state,),
+                :,
                 CDC_CRITERIA_POSITIVE_STREAK_FIELD_PRE_FORMAT.format(
                     criteria_field=criteria_field
                 ),
@@ -1145,7 +1157,7 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
 
             # Add the negative streak series to the combined frame.
             state_df.loc[
-                (state,),
+                :,
                 CDC_CRITERIA_NEGATIVE_STREAK_FIELD_PRE_FORMAT.format(
                     criteria_field=criteria_field
                 ),
