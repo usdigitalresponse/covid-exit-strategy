@@ -181,8 +181,7 @@ _CDC_CRITERIA_5_STREAK_STATE_SUMMARY_FIELDS = [
 
 # Define the list of CDC Criteria 6 fields that should have streak fields appear in the state summary tab.
 _CDC_CRITERIA_6_STREAK_STATE_SUMMARY_FIELDS = [
-    CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
-    CDC_CRITERIA_6A_MAX_PERCENT_THRESHOLD,
+    CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE
 ]
 
 
@@ -302,6 +301,7 @@ CRITERIA_1_SUMMARY_COLUMNS = [
     LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
+
 
 (
     _,
@@ -839,7 +839,8 @@ def transform_covidtracking_data(covidtracking_df):
             | covidtracking_df.loc[(state,), CDC_CRITERIA_2_COMBINED_FIELD]
         ).values
 
-        # Calculate criteria streaks for Criteria 1 (A, B, C, D, Combined) and Criteria 2 (A, B, C, D, Combined).
+        # Calculate criteria streaks for Criteria 1 (A, B, C, D, Combined), Criteria 2 (A, B, C, D, Combined), and
+        # Criteria 6 (A).
         for criteria_field in [
             CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD,
             CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
@@ -851,6 +852,7 @@ def transform_covidtracking_data(covidtracking_df):
             CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
             CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
             CDC_CRITERIA_2_COMBINED_FIELD,
+            CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
         ]:
             # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
             positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
@@ -878,6 +880,9 @@ def transform_covidtracking_data(covidtracking_df):
 
     # Remove the multi-index, converting date and state back to just columns.
     covidtracking_df = covidtracking_df.reset_index(drop=False)
+
+    # Use the date for each data entry as when the data were last updated.
+    covidtracking_df[LAST_UPDATED_FIELD] = covidtracking_df[DATE_SOURCE_FIELD]
 
     # Join to lags of important variables that we want to plot in sparklines.
     for field_to_lag, num_lags in [
