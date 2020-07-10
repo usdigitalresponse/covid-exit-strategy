@@ -398,6 +398,41 @@ CRITERIA_6_SUMMARY_COLUMNS = [
     LAST_UPDATED_FIELD,
 ]
 
+CRITERIA_COMBINED_SUMMARY_COLUMNS = [
+    STATE_FIELD,
+    CDC_CRITERIA_1A_COVID_CONTINUOUS_DECLINE_FIELD,
+    CDC_CRITERIA_1B_COVID_NO_REBOUNDS_FIELD,
+    CDC_CRITERIA_1C_COVID_OVERALL_DECLINE_FIELD,
+    CDC_CRITERIA_1D_COVID_NEAR_ZERO_INCIDENCE,
+    CDC_CRITERIA_1_COMBINED_FIELD,
+    *CDC_CRITERIA_1_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_1_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
+    CDC_CRITERIA_2A_COVID_PERCENT_CONTINUOUS_DECLINE_FIELD,
+    CDC_CRITERIA_2B_COVID_TOTAL_TEST_VOLUME_INCREASING_FIELD,
+    CDC_CRITERIA_2C_COVID_PERCENT_OVERALL_DECLINE_FIELD,
+    CDC_CRITERIA_2D_COVID_NEAR_ZERO_POSITIVE_TESTS_FIELD,
+    CDC_CRITERIA_2_COMBINED_FIELD,
+    *CDC_CRITERIA_2_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_2_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
+    CDC_CRITERIA_3A_HOSPITAL_BED_UTILIZATION_FIELD,
+    CDC_CRITERIA_3_COMBINED_FIELD,
+    *CDC_CRITERIA_3_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_3_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
+    CDC_CRITERIA_5A_14_DAY_DECLINE_TOTAL_ILI,
+    CDC_CRITERIA_5B_OVERALL_DECLINE_TOTAL_ILI,
+    CDC_CRITERIA_5C_14_DAY_DECLINE_PERCENT_ILI,
+    CDC_CRITERIA_5D_OVERALL_DECLINE_PERCENT_ILI,
+    CDC_CRITERIA_5_COMBINED,
+    *CDC_CRITERIA_5_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_5_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
+    CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
+    # Add streak fields.
+    *CDC_CRITERIA_6_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
+    *CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
+    LAST_RAN_FIELD,
+    LAST_UPDATED_FIELD,
+]
+
 
 def transform_covidtracking_data(covidtracking_df):
     """Transforms data from https://covidtracking.com/ and calculates CDC Criteria 1 (A, B, C, D) and 2 (A, B, C, D)."""
@@ -855,7 +890,10 @@ def transform_covidtracking_data(covidtracking_df):
             CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE,
         ]:
             # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
-            positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
+            (
+                positive_streak_series,
+                negative_streak_series,
+            ) = calculate_consecutive_boolean_series(
                 boolean_series=covidtracking_df.loc[(state,), criteria_field]
             )
 
@@ -1030,7 +1068,10 @@ def transform_cdc_ili_data(ili_df):
             CDC_CRITERIA_5_COMBINED,
         ]:
             # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
-            positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
+            (
+                positive_streak_series,
+                negative_streak_series,
+            ) = calculate_consecutive_boolean_series(
                 boolean_series=ili_df.loc[(state,), criteria_field]
             )
 
@@ -1136,7 +1177,10 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
             CDC_CRITERIA_3_COMBINED_FIELD,
         ]:
             # Calculate both the negative (not meeting criteria) and positive (meeting criteria) streak series.
-            positive_streak_series, negative_streak_series = calculate_consecutive_boolean_series(
+            (
+                positive_streak_series,
+                negative_streak_series,
+            ) = calculate_consecutive_boolean_series(
                 boolean_series=state_df[criteria_field]
             )
 
