@@ -169,7 +169,9 @@ def extract_transform_and_load_covid_data():
 
     # Merge all the summary data frames so that we can create a single summary sheet.
     combined_df = functools.reduce(
-        lambda left, right: pd.merge(left, right, on=[STATE_FIELD], how="outer"),
+        # Use an inner join so that you'll only get entities that are represented in all criteria.
+        # E.g., you'll not include Guam, NYC, etc which are reported separately in some of the sources.
+        lambda left, right: pd.merge(left, right, on=[STATE_FIELD], how="inner"),
         [
             criteria_1_summary_df,
             criteria_2_summary_df,
