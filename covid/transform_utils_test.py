@@ -519,7 +519,10 @@ class TransformUtilsTest(unittest.TestCase):
         )
 
     def test_calculate_consecutive_boolean_series(self):
-        consecutive_true_series, consecutive_false_series = calculate_consecutive_boolean_series(
+        (
+            consecutive_true_series,
+            consecutive_false_series,
+        ) = calculate_consecutive_boolean_series(
             boolean_series=pd.Series(
                 data=[True, True, False, True, False, False, False],
                 index=pd.DatetimeIndex(
