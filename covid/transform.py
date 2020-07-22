@@ -140,7 +140,7 @@ CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE = "CDC Criteria 6A"
 # Policy vs. Trend charts data fields.
 POLICY_VS_TREND_RAW_CASES_PER_MILLION = "Policy vs. Trend Raw Cases per Million"
 POLICY_VS_TREND_3DCS_CASES_PER_MILLION = "Policy vs. Trend 3DCS Cases per Million"
-POLICY_VS_TREND_POSITIVITY = "Policy vs. Trend Positivity"
+POLICY_VS_TREND_3DCS_POSITIVITY = "Policy vs. Trend Positivity (3DCS)"
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
@@ -430,7 +430,7 @@ CRITERIA_COMBINED_SUMMARY_COLUMNS = [
     _,
     policy_vs_trend_positivity_lag_fields,
 ) = generate_lag_column_name_formatter_and_column_names(
-    column_name=POLICY_VS_TREND_POSITIVITY, num_lags=91
+    column_name=POLICY_VS_TREND_3DCS_POSITIVITY, num_lags=91
 )
 
 
@@ -441,7 +441,7 @@ POLICY_VS_TREND_SUMMARY_COLUMNS = [
     *policy_vs_trend_3dcs_cases_per_million_lag_fields,
     POLICY_VS_TREND_3DCS_CASES_PER_MILLION,
     *policy_vs_trend_positivity_lag_fields,
-    POLICY_VS_TREND_POSITIVITY,
+    POLICY_VS_TREND_3DCS_POSITIVITY,
     LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
@@ -940,7 +940,7 @@ def transform_covidtracking_data(covidtracking_df):
 
         # Calculate positivity 3DCS.
         covidtracking_df.loc[
-            (state,), POLICY_VS_TREND_POSITIVITY
+            (state,), POLICY_VS_TREND_3DCS_POSITIVITY
         ] = covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD].values
 
     # Add an update time.
@@ -959,7 +959,7 @@ def transform_covidtracking_data(covidtracking_df):
         (NEW_TESTS_TOTAL_3DCS_FIELD, 31),
         (POLICY_VS_TREND_RAW_CASES_PER_MILLION, 91),
         (POLICY_VS_TREND_3DCS_CASES_PER_MILLION, 91),
-        (POLICY_VS_TREND_POSITIVITY, 91),
+        (POLICY_VS_TREND_3DCS_POSITIVITY, 91),
     ]:
         lags = generate_lags(
             df=covidtracking_df, column=field_to_lag, num_lags=num_lags
