@@ -16,6 +16,8 @@ from covid.transform_utils import fit_and_predict_cubic_spline_in_r
 from covid.transform_utils import generate_lag_column_name_formatter_and_column_names
 from covid.transform_utils import generate_lags
 
+# Define miscellaneous constants.
+ONE_MILLION = 1_000_000
 
 # Define output field names.
 # Criteria Category 1 Fields.
@@ -134,6 +136,11 @@ MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3D_FIELD = (
     "Highest % Positive (14 day window, 3-day average)"
 )
 CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE = "CDC Criteria 6A"
+
+# Policy vs. Trend charts data fields.
+POLICY_VS_TREND_RAW_CASES_PER_MILLION = "Policy vs. Trend Raw Cases per Million"
+POLICY_VS_TREND_3DCS_CASES_PER_MILLION = "Policy vs. Trend 3DCS Cases per Million"
+POLICY_VS_TREND_POSITIVITY = "Policy vs. Trend Positivity"
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
@@ -402,6 +409,39 @@ CRITERIA_COMBINED_SUMMARY_COLUMNS = [
     # Add streak fields.
     *CDC_CRITERIA_6_POSITIVE_STREAK_STATE_SUMMARY_FIELDS,
     *CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS,
+    LAST_RAN_FIELD,
+    LAST_UPDATED_FIELD,
+]
+
+# Define custom sheets columns.
+(
+    _,
+    policy_vs_trend_raw_cases_per_million_lag_fields,
+) = generate_lag_column_name_formatter_and_column_names(
+    column_name=POLICY_VS_TREND_RAW_CASES_PER_MILLION, num_lags=91
+)
+(
+    _,
+    policy_vs_trend_3dcs_cases_per_million_lag_fields,
+) = generate_lag_column_name_formatter_and_column_names(
+    column_name=POLICY_VS_TREND_3DCS_CASES_PER_MILLION, num_lags=91
+)
+(
+    _,
+    policy_vs_trend_positivity_lag_fields,
+) = generate_lag_column_name_formatter_and_column_names(
+    column_name=POLICY_VS_TREND_POSITIVITY, num_lags=91
+)
+
+
+POLICY_VS_TREND_SUMMARY_COLUMNS = [
+    STATE_FIELD,
+    *policy_vs_trend_raw_cases_per_million_lag_fields,
+    POLICY_VS_TREND_RAW_CASES_PER_MILLION,
+    *policy_vs_trend_3dcs_cases_per_million_lag_fields,
+    POLICY_VS_TREND_3DCS_CASES_PER_MILLION,
+    *policy_vs_trend_positivity_lag_fields,
+    POLICY_VS_TREND_POSITIVITY,
     LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
@@ -886,6 +926,23 @@ def transform_covidtracking_data(covidtracking_df):
                 ),
             ] = negative_streak_series.values
 
+        # Calculate policy vs. trend charts data.
+        # Calculate raw cases per million.
+        covidtracking_df.loc[(state,), POLICY_VS_TREND_RAW_CASES_PER_MILLION] = (
+            covidtracking_df.loc[(state,), NEW_CASES_FIELD].values / state_population
+        ) * ONE_MILLION
+
+        # Calculate 3DCS cases per million.
+        covidtracking_df.loc[(state,), POLICY_VS_TREND_3DCS_CASES_PER_MILLION] = (
+            covidtracking_df.loc[(state,), NEW_CASES_3DCS_FIELD].values
+            / state_population
+        ) * ONE_MILLION
+
+        # Calculate positivity 3DCS.
+        covidtracking_df.loc[
+            (state,), POLICY_VS_TREND_POSITIVITY
+        ] = covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD].values
+
     # Add an update time.
     covidtracking_df[LAST_RAN_FIELD] = datetime.datetime.now()
 
@@ -900,6 +957,9 @@ def transform_covidtracking_data(covidtracking_df):
         (NEW_CASES_3DCS_FIELD, 121),
         (PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD, 31),
         (NEW_TESTS_TOTAL_3DCS_FIELD, 31),
+        (POLICY_VS_TREND_RAW_CASES_PER_MILLION, 91),
+        (POLICY_VS_TREND_3DCS_CASES_PER_MILLION, 91),
+        (POLICY_VS_TREND_POSITIVITY, 91),
     ]:
         lags = generate_lags(
             df=covidtracking_df, column=field_to_lag, num_lags=num_lags
