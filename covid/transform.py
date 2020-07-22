@@ -140,7 +140,7 @@ CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE = "CDC Criteria 6A"
 # Policy vs. Trend charts data fields.
 POLICY_VS_TREND_RAW_CASES_PER_MILLION = "Policy vs. Trend Cases per Million (Raw)"
 POLICY_VS_TREND_3DCS_CASES_PER_MILLION = "Policy vs. Trend Cases per Million (3DCS)"
-POLICY_VS_TREND_3DCS_POSITIVITY = "Policy vs. Trend Positivity (3DCS)"
+POLICY_VS_TREND_3DCS_POSITIVITY = "Policy vs. Trend % Positivity (3DCS)"
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
@@ -941,7 +941,9 @@ def transform_covidtracking_data(covidtracking_df):
         # Calculate positivity 3DCS.
         covidtracking_df.loc[
             (state,), POLICY_VS_TREND_3DCS_POSITIVITY
-        ] = covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD].values
+        ] = covidtracking_df.loc[
+            (state,), FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD
+        ].values
 
     # Add an update time.
     covidtracking_df[LAST_RAN_FIELD] = datetime.datetime.now()
