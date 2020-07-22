@@ -138,8 +138,8 @@ MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3D_FIELD = (
 CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE = "CDC Criteria 6A"
 
 # Policy vs. Trend charts data fields.
-POLICY_VS_TREND_RAW_CASES_PER_MILLION = "Policy vs. Trend Raw Cases per Million"
-POLICY_VS_TREND_3DCS_CASES_PER_MILLION = "Policy vs. Trend 3DCS Cases per Million"
+POLICY_VS_TREND_RAW_CASES_PER_MILLION = "Policy vs. Trend Cases per Million (Raw)"
+POLICY_VS_TREND_3DCS_CASES_PER_MILLION = "Policy vs. Trend Cases per Million (3DCS)"
 POLICY_VS_TREND_3DCS_POSITIVITY = "Policy vs. Trend Positivity (3DCS)"
 
 # Other fields
