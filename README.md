@@ -47,5 +47,5 @@ code before every commit we make to the codebase. Pre-commit hooks are defined i
 
 2.  Run `pre-commit install` to install the specific git hooks used in this repository.
 
-`pre-commit` will run on files in git staging automatically. You can force a re-run on all files with
-`pre-commit run --all-files`.
+Now, any time you commit code to the repository, the hooks will run on all modified files automatically. If you wish,
+you can force a re-run on all files with `pre-commit run --all-files`.
