@@ -155,16 +155,14 @@ def generate_lags(df, column, num_lags=121, lag_timedelta=datetime.timedelta(day
     return lags_df
 
 
-def calculate_state_summary(transformed_df, columns):
+def calculate_summary(transformed_df, columns):
     # Find current date, and drop all other rows.
     current_date = transformed_df.loc[:, DATE_SOURCE_FIELD].max()
 
-    state_summary_df = transformed_df.copy()
-    state_summary_df = state_summary_df.loc[
-        state_summary_df[DATE_SOURCE_FIELD] == current_date, columns
-    ]
+    summary_df = transformed_df.copy()
+    summary_df = summary_df.loc[summary_df[DATE_SOURCE_FIELD] == current_date, columns]
 
-    return state_summary_df
+    return summary_df
 
 
 def calculate_consecutive_boolean_series(boolean_series):

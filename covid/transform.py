@@ -1228,3 +1228,29 @@ def indication_of_rebound(series_):
             indicator = "Rebound"
 
     return indicator
+
+
+def transform_county_data(covidatlas_df):
+    """Takes a df with historical county-level observations and generates a df in our desired format with computed
+    columns.
+    """
+    # Limit results to US counties.
+    county_df = covidatlas_df[
+        (covidatlas_df["level"] == "county")
+        & (covidatlas_df["country"] == "United States")
+    ]
+
+    # Parse FIPS because we'll use this for maps as an index (instead of county name).
+    county_df["FIPS"] = county_df["locationID"].transform(
+        lambda x: x.split("#")[-1].replace("fips:", "")
+    )
+
+    county_df[DATE_SOURCE_FIELD] = county_df[DATE_SOURCE_FIELD].astype(str)
+    county_df[DATE_SOURCE_FIELD] = pd.to_datetime(county_df[DATE_SOURCE_FIELD])
+    county_df = county_df.set_index(DATE_SOURCE_FIELD)
+    county_df = county_df.reset_index()
+
+    # TODO (patricksheehan): remove this filter when we want to store more historical data
+    county_df = county_df.loc["2020-07-31":]
+
+    return county_df

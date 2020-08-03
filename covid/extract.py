@@ -29,6 +29,10 @@ LAST_UPDATED_SOURCE_FIELD = "dateModified"
 CATEGORY_3_DATA_GOOGLE_SHEET_KEY = "1-BSd5eFbNsypygMkhuGX1OWoUsF2u4chpsu6aC4cgVo"
 CATEGORY_3_HISTORICAL_DATA_TAB = "Historical Data"
 
+
+# Define the url used for covidatlas.com which we use for county-level data.
+_COVID_ATLAS_TIME_SERIES_URL = "https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/timeseries.csv"
+
 logger = logging.getLogger(__name__)
 
 
@@ -202,3 +206,12 @@ def extract_cdc_beds_historical_data(credentials):
     cdc_historical_df = cdc_historical_df.set_index(STATE_FIELD)
 
     return cdc_historical_df
+
+
+def extract_covid_atlas_data():
+    """This function pulls a time series of all county-level data available using covidatlas.com."""
+    # Pull all historical data available.
+    logger.info("Downloading Covid Atlas data (this may take a while).")
+    historical_df = pd.read_csv(_COVID_ATLAS_TIME_SERIES_URL)
+    logger.info("Finished downloading Covid Atlas data.")
+    return historical_df

@@ -1,12 +1,12 @@
 # Define source field names.
 import functools
+import logging
 import os
 
 import pandas as pd
 
 from covid.constants import PATH_TO_SERVICE_ACCOUNT_KEY
-from covid.extract import extract_cdc_ili_data
-from covid.extract import extract_covidtracking_historical_data
+from covid.extract import extract_covid_atlas_data
 from covid.load import get_sheets_client
 from covid.load import post_dataframe_to_google_sheets
 from covid.load_utils import sleep_and_log
@@ -17,9 +17,8 @@ from covid.transform import CRITERIA_6_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_COMBINED_SUMMARY_COLUMNS
 from covid.transform import STATE_FIELD
 from covid.transform import STATE_SUMMARY_COLUMNS
-from covid.transform import transform_cdc_ili_data
-from covid.transform import transform_covidtracking_data
-from covid.transform_utils import calculate_state_summary
+from covid.transform import transform_county_data
+from covid.transform_utils import calculate_summary
 
 # Define the names of the tabs to upload to.
 CDC_GUIDANCE_GOOGLE_WORKBOOK_KEY = "1s534JoVjsetLDUxzkww3yQSnRj9H-8QLMKPUrq7RAuc"
@@ -37,6 +36,10 @@ CDC_CRITERIA_SUMMARY_GOOGLE_WORKBOOK_KEY = (
     "1aHvKgCfyIlWYHgBSE26cPd5jE0yZYgctcxniyZfWpu8"
 )
 
+COUNTY_LEVEL_GOOGLE_WORKBOOK_KEY = "1CPB2HC0q-uonKZtN6KqvXMcJbo9cvMv86XcW22YWLzQ"
+
+logger = logging.getLogger(__name__)
+
 # Note: if you'd like to run the full pipeline, you'll need to generate a service account keyfile for an account
 # that has been given write access to the Google Sheet.
 
@@ -51,7 +54,7 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
             debugging of data processing
 
     """
-    print("Starting to ETL...")
+    logger.info("Starting to ETL...")
 
     client, credentials = get_sheets_client(
         credential_file_path=os.path.abspath(PATH_TO_SERVICE_ACCOUNT_KEY)
@@ -67,7 +70,7 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
     # )
 
     # Upload category 3A data.
-    # criteria_3_summary_df = calculate_state_summary(
+    # criteria_3_summary_df = calculate_summary(
     #     transformed_df=transformed_cdc_beds_df, columns=CRITERIA_3_SUMMARY_COLUMNS
     # )
     # post_dataframe_to_google_sheets(
@@ -86,19 +89,32 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
     #     credentials=credentials,
     # )
 
-    covidtracking_df = extract_covidtracking_historical_data()
-    cdc_ili_df = extract_cdc_ili_data()
+    covidatlas_df = extract_covid_atlas_data()
+    # covidtracking_df = extract_covidtracking_historical_data()
+    # cdc_ili_df = extract_cdc_ili_data()
 
-    transformed_cdc_ili_df = transform_cdc_ili_data(ili_df=cdc_ili_df)
+    transformed_county_df = transform_county_data(covidatlas_df)
+    # transformed_cdc_ili_df = transform_cdc_ili_data(ili_df=cdc_ili_df)
+    # transformed_covidtracking_df = transform_covidtracking_data(
+    #     covidtracking_df=covidtracking_df
+    # )
 
-    transformed_covidtracking_df = transform_covidtracking_data(
-        covidtracking_df=covidtracking_df
-    )
+    # Upload county-level data for all US counties.
+    if post_to_google_sheets:
+        post_dataframe_to_google_sheets(
+            df=calculate_summary(
+                transformed_df=transformed_county_df,
+                columns=["name", "FIPS", "cases", "tested", "deaths"],
+            ),
+            workbook_key=COUNTY_LEVEL_GOOGLE_WORKBOOK_KEY,
+            tab_name="latest_data",
+            credentials=credentials,
+        )
 
     # Upload summary for all states.
     if post_to_google_sheets:
         post_dataframe_to_google_sheets(
-            df=calculate_state_summary(
+            df=calculate_summary(
                 transformed_df=transformed_covidtracking_df,
                 columns=STATE_SUMMARY_COLUMNS,
             ),
@@ -111,7 +127,7 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
         sleep_and_log()
 
     # Upload Criteria 1 workbook for all states.
-    criteria_1_summary_df = calculate_state_summary(
+    criteria_1_summary_df = calculate_summary(
         transformed_df=transformed_covidtracking_df, columns=CRITERIA_1_SUMMARY_COLUMNS
     )
 
@@ -126,7 +142,7 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
         sleep_and_log()
 
     # Upload Criteria 2 workbook for all states.
-    criteria_2_summary_df = calculate_state_summary(
+    criteria_2_summary_df = calculate_summary(
         transformed_df=transformed_covidtracking_df, columns=CRITERIA_2_SUMMARY_COLUMNS
     )
     if post_to_google_sheets:
@@ -152,7 +168,7 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
         sleep_and_log()
 
     # Upload state summary tab for Criteria 5.
-    criteria_5_summary_df = calculate_state_summary(
+    criteria_5_summary_df = calculate_summary(
         transformed_df=transformed_cdc_ili_df, columns=CRITERIA_5_SUMMARY_COLUMNS
     )
     if post_to_google_sheets:
@@ -166,7 +182,7 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
         sleep_and_log()
 
     # Upload state summary tab for Criteria 6.
-    criteria_6_summary_df = calculate_state_summary(
+    criteria_6_summary_df = calculate_summary(
         transformed_df=transformed_covidtracking_df, columns=CRITERIA_6_SUMMARY_COLUMNS
     )
     if post_to_google_sheets:
@@ -216,5 +232,6 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     # Note: for faster debugging during development, you can set `post_to_google_sheets` to `False`.
     extract_transform_and_load_covid_data(post_to_google_sheets=True)
