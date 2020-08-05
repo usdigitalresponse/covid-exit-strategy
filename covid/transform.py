@@ -245,6 +245,26 @@ CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
     for criteria_field in _CDC_CRITERIA_6_STREAK_STATE_SUMMARY_FIELDS
 ]
 
+# Define fields for our county-level data.
+COUNTY_LAST_UPDATED_FIELD = "LAST UPDATED"
+COUNTY_STATE_FIELD = "STATE"
+COUNTY_FIELD = "COUNTY"
+COUNTY_FIPS_FIELD = "FIPS"
+COUNTY_NEW_CASES_FIELD = "NEW CASES"
+COUNTY_NEW_CASES_PM_FIELD = "NEW CASES PER MILLION"
+COUNTY_POSITIVITY_FIELD = "POSITIVITY"
+
+# Define the list of columns for county-level data.
+COUNTY_SUMMARY_COLUMNS = [
+    COUNTY_LAST_UPDATED_FIELD,
+    COUNTY_STATE_FIELD,
+    COUNTY_FIELD,
+    COUNTY_FIPS_FIELD,
+    COUNTY_NEW_CASES_FIELD,
+    COUNTY_NEW_CASES_PM_FIELD,
+    COUNTY_POSITIVITY_FIELD,
+]
+
 
 # Define the list of columns that should appear in the state summary tab.
 STATE_SUMMARY_COLUMNS = [
@@ -1241,13 +1261,33 @@ def transform_county_data(covidatlas_df):
     ]
 
     # Parse FIPS because we'll use this for maps as an index (instead of county name).
-    county_df["FIPS"] = county_df["locationID"].transform(
+    county_df[COUNTY_FIPS_FIELD] = county_df["locationID"].transform(
         lambda x: x.split("#")[-1].replace("fips:", "")
     )
 
+    # Set date index.
+    county_df[COUNTY_LAST_UPDATED_FIELD] = county_df[DATE_SOURCE_FIELD]
     county_df[DATE_SOURCE_FIELD] = county_df[DATE_SOURCE_FIELD].astype(str)
     county_df[DATE_SOURCE_FIELD] = pd.to_datetime(county_df[DATE_SOURCE_FIELD])
     county_df = county_df.set_index(DATE_SOURCE_FIELD)
+
+    # Rename primary columns.
+    county_df = county_df.rename(
+        columns={
+            "county": COUNTY_FIELD,
+            "state": COUNTY_STATE_FIELD,
+            "cases": COUNTY_NEW_CASES_FIELD,
+        }
+    )
+
+    population_series = county_df["population"]
+    county_df[COUNTY_NEW_CASES_PM_FIELD] = (
+        county_df[COUNTY_NEW_CASES_FIELD] / population_series * 1e6
+    )
+
+    test_series = county_df["tested"]
+    county_df[COUNTY_POSITIVITY_FIELD] = county_df[COUNTY_NEW_CASES_FIELD] / test_series
+
     county_df = county_df.reset_index()
 
     # TODO (patricksheehan): remove this filter when we want to store more historical data

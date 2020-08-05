@@ -10,6 +10,7 @@ from covid.extract import extract_covid_atlas_data
 from covid.load import get_sheets_client
 from covid.load import post_dataframe_to_google_sheets
 from covid.load_utils import sleep_and_log
+from covid.transform import COUNTY_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_1_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_2_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_5_SUMMARY_COLUMNS
@@ -103,8 +104,7 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
     if post_to_google_sheets:
         post_dataframe_to_google_sheets(
             df=calculate_summary(
-                transformed_df=transformed_county_df,
-                columns=["name", "FIPS", "cases", "tested", "deaths"],
+                transformed_df=transformed_county_df, columns=COUNTY_SUMMARY_COLUMNS,
             ),
             workbook_key=COUNTY_LEVEL_GOOGLE_WORKBOOK_KEY,
             tab_name="latest_data",
