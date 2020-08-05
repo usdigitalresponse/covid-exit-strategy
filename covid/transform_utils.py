@@ -47,7 +47,7 @@ def fit_and_predict_cubic_spline_in_r(
     if replace_nan:
         series_ = series_.fillna(value=0)
 
-    r_x = robjects.DateVector(series_.index)
+    r_x = robjects.DateVector(series_.index.get_level_values(DATE_SOURCE_FIELD))
     r_y = robjects.FloatVector(series_.values.astype(float))
 
     # Extract R's smoothing function.

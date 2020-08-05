@@ -1,5 +1,6 @@
 import datetime
 
+import numpy as np
 import pandas as pd
 
 from covid.extract import DATE_SOURCE_FIELD
@@ -251,8 +252,14 @@ COUNTY_STATE_FIELD = "STATE"
 COUNTY_FIELD = "COUNTY"
 COUNTY_FIPS_FIELD = "FIPS"
 COUNTY_NEW_CASES_FIELD = "NEW CASES"
+COUNTY_NEW_CASES_3DRA_FIELD = "NEW CASES (3DRA)"
+COUNTY_NEW_CASES_3DCS_FIELD = "NEW CASES (3DCS)"
 COUNTY_NEW_CASES_PM_FIELD = "NEW CASES PER MILLION"
+COUNTY_NEW_CASES_PM_3DRA_FIELD = "NEW CASES PER MILLION (3DRA)"
+COUNTY_NEW_CASES_PM_3DCS_FIELD = "NEW CASES PER MILLION (3DCS)"
 COUNTY_POSITIVITY_FIELD = "POSITIVITY"
+COUNTY_POSITIVITY_3DCS_FIELD = "POSITIVITY (3DCS)"
+COUNTY_POSITIVITY_3DRA_FIELD = "POSITIVITY (3DRA)"
 
 # Define the list of columns for county-level data.
 COUNTY_SUMMARY_COLUMNS = [
@@ -260,9 +267,10 @@ COUNTY_SUMMARY_COLUMNS = [
     COUNTY_STATE_FIELD,
     COUNTY_FIELD,
     COUNTY_FIPS_FIELD,
-    COUNTY_NEW_CASES_FIELD,
-    COUNTY_NEW_CASES_PM_FIELD,
-    COUNTY_POSITIVITY_FIELD,
+    COUNTY_NEW_CASES_3DCS_FIELD,
+    COUNTY_NEW_CASES_PM_3DCS_FIELD,
+    COUNTY_POSITIVITY_3DCS_FIELD,
+    # *[f"{field} T-{i:02}" for i in range(0, 15) for field in [COUNTY_NEW_CASES_3DCS_FIELD, COUNTY_NEW_CASES_PM_3DCS_FIELD, COUNTY_POSITIVITY_3DCS_FIELD]],
 ]
 
 
@@ -1261,15 +1269,19 @@ def transform_county_data(covidatlas_df):
     ]
 
     # Parse FIPS because we'll use this for maps as an index (instead of county name).
-    county_df[COUNTY_FIPS_FIELD] = county_df["locationID"].transform(
+    county_df.loc[:, COUNTY_FIPS_FIELD] = county_df["locationID"].transform(
         lambda x: x.split("#")[-1].replace("fips:", "")
     )
 
     # Set date index.
-    county_df[COUNTY_LAST_UPDATED_FIELD] = county_df[DATE_SOURCE_FIELD]
-    county_df[DATE_SOURCE_FIELD] = county_df[DATE_SOURCE_FIELD].astype(str)
-    county_df[DATE_SOURCE_FIELD] = pd.to_datetime(county_df[DATE_SOURCE_FIELD])
+    county_df.loc[:, COUNTY_LAST_UPDATED_FIELD] = county_df[DATE_SOURCE_FIELD]
+    county_df.loc[:, DATE_SOURCE_FIELD] = county_df[DATE_SOURCE_FIELD].astype(str)
+    county_df.loc[:, DATE_SOURCE_FIELD] = pd.to_datetime(county_df[DATE_SOURCE_FIELD])
     county_df = county_df.set_index(DATE_SOURCE_FIELD)
+    # TODO (patricksheehan): remove this filter when we want to store more historical data
+    county_df = county_df.loc["2020-07-10":]
+
+    county_df = county_df.set_index(COUNTY_FIPS_FIELD, append=True)
 
     # Rename primary columns.
     county_df = county_df.rename(
@@ -1281,16 +1293,33 @@ def transform_county_data(covidatlas_df):
     )
 
     population_series = county_df["population"]
-    county_df[COUNTY_NEW_CASES_PM_FIELD] = (
-        county_df[COUNTY_NEW_CASES_FIELD] / population_series * 1e6
+    county_df.loc[:, COUNTY_NEW_CASES_PM_FIELD] = (
+        county_df.loc[:, COUNTY_NEW_CASES_FIELD] / population_series * 1e6
     )
 
     test_series = county_df["tested"]
-    county_df[COUNTY_POSITIVITY_FIELD] = county_df[COUNTY_NEW_CASES_FIELD] / test_series
+    test_series.loc[test_series == 0.0] = np.NaN
+    county_df.loc[:, COUNTY_POSITIVITY_FIELD] = (
+        county_df[COUNTY_NEW_CASES_FIELD] / test_series
+    )
+
+    for column in [
+        COUNTY_NEW_CASES_FIELD,
+        COUNTY_NEW_CASES_PM_FIELD,
+        COUNTY_POSITIVITY_FIELD,
+    ]:
+        print(f"Calculating County 3DCS for {column}.")
+
+        # Calculate the 3-day rolling average for the column.
+        rolling_avg_column = f"{column} (3DRA)"
+        county_df.loc[:, rolling_avg_column] = county_df.groupby(COUNTY_FIPS_FIELD)[
+            column
+        ].apply(lambda x: x.rolling(window=3, min_periods=1, center=False).mean())
+
+        county_df.loc[:, f"{column} (3DCS)"] = county_df.groupby(COUNTY_FIPS_FIELD)[
+            rolling_avg_column
+        ].apply(fit_and_predict_cubic_spline_in_r, smoothing_parameter=0.5,)
 
     county_df = county_df.reset_index()
-
-    # TODO (patricksheehan): remove this filter when we want to store more historical data
-    county_df = county_df.loc["2020-07-31":]
 
     return county_df
