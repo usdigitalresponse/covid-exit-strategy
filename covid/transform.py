@@ -926,9 +926,9 @@ def transform_covidtracking_data(covidtracking_df):
         (NEW_CASES_3DCS_FIELD, 121, False),
         (PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD, 31, False),
         (NEW_TESTS_TOTAL_3DCS_FIELD, 31, False),
-        (POLICY_VS_TREND_RAW_CASES_PER_MILLION, 91, True),
-        (POLICY_VS_TREND_3DCS_CASES_PER_MILLION, 91, True),
-        (POLICY_VS_TREND_3DCS_POSITIVITY, 91, True),
+        (POLICY_VS_TREND_RAW_CASES_PER_MILLION, 300, True),
+        (POLICY_VS_TREND_3DCS_CASES_PER_MILLION, 300, True),
+        (POLICY_VS_TREND_3DCS_POSITIVITY, 300, True),
     ]:
         lags = generate_lags(
             df=covidtracking_df,
