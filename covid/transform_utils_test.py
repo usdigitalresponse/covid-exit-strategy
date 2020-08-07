@@ -3,6 +3,7 @@ import unittest
 
 import numpy as np
 import pandas as pd
+from pandas.testing import assert_frame_equal
 from pandas.testing import assert_series_equal
 
 from covid.transform_utils import calculate_consecutive_boolean_series
@@ -10,9 +11,74 @@ from covid.transform_utils import calculate_consecutive_positive_or_negative_val
 from covid.transform_utils import calculate_max_run_in_window
 from covid.transform_utils import fit_and_predict_cubic_spline
 from covid.transform_utils import fit_and_predict_cubic_spline_in_r
+from covid.transform_utils import generate_lags
 
 
 class TransformUtilsTest(unittest.TestCase):
+    def test_generate_lags(self):
+        # Test that by default, we suffix the lag column names with the lag amount.
+        assert_frame_equal(
+            generate_lags(
+                df=pd.DataFrame(
+                    index=[0, 1, 2],
+                    data=[
+                        ("2020-01-01", "Alaska", 1.0),
+                        ("2020-01-02", "Alaska", 2.0),
+                        ("2020-01-03", "Alaska", 3.0),
+                    ],
+                    columns=["date", "State", "value"],
+                ),
+                column="value",
+                num_lags=4,
+                lag_timedelta=datetime.timedelta(days=1),
+            ),
+            pd.DataFrame(
+                index=[0],
+                data=[("Alaska", datetime.datetime(2020, 1, 3), 3.0, 2.0, 1.0, None)],
+                columns=[
+                    "State",
+                    "date",
+                    "value T-0",
+                    "value T-1",
+                    "value T-2",
+                    "value T-3",
+                ],
+            ),
+            check_dtype=False,
+        )
+
+        # Test that passing `suffix_with_date`, instead suffixes the lag column names with the date.
+        assert_frame_equal(
+            generate_lags(
+                df=pd.DataFrame(
+                    index=[0, 1, 2],
+                    data=[
+                        ("2020-01-01", "Alaska", 1.0),
+                        ("2020-01-02", "Alaska", 2.0),
+                        ("2020-01-03", "Alaska", 3.0),
+                    ],
+                    columns=["date", "State", "value"],
+                ),
+                column="value",
+                num_lags=4,
+                lag_timedelta=datetime.timedelta(days=1),
+                suffix_with_date=True,
+            ),
+            pd.DataFrame(
+                index=[0],
+                data=[("Alaska", datetime.datetime(2020, 1, 3), 3.0, 2.0, 1.0, None)],
+                columns=[
+                    "State",
+                    "date",
+                    "value-2020-01-03",
+                    "value-2020-01-02",
+                    "value-2020-01-01",
+                    "value-2019-12-31",
+                ],
+            ),
+            check_dtype=False,
+        )
+
     def test_find_consecutive_positive_or_negative_values(self):
         assert_series_equal(
             calculate_consecutive_positive_or_negative_values(

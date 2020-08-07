@@ -5,6 +5,7 @@ import os
 import pandas as pd
 
 from covid.constants import PATH_TO_SERVICE_ACCOUNT_KEY
+from covid.extract import DATE_SOURCE_FIELD
 from covid.extract import extract_cdc_ili_data
 from covid.extract import extract_covidtracking_historical_data
 from covid.load import get_sheets_client
@@ -15,6 +16,8 @@ from covid.transform import CRITERIA_2_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_5_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_6_SUMMARY_COLUMNS
 from covid.transform import CRITERIA_COMBINED_SUMMARY_COLUMNS
+from covid.transform import LAST_RAN_FIELD
+from covid.transform import LAST_UPDATED_FIELD
 from covid.transform import STATE_FIELD
 from covid.transform import transform_cdc_ili_data
 from covid.transform import transform_covidtracking_data
@@ -35,10 +38,14 @@ CDC_CRITERIA_SUMMARY_GOOGLE_WORKBOOK_KEY = (
     "1aHvKgCfyIlWYHgBSE26cPd5jE0yZYgctcxniyZfWpu8"
 )
 
+# Define custom workbook keys.
+POLICY_VS_TREND_CHARTS_DATA_WORKBOOK_KEY = (
+    "1gRexnz4AJAIYJ6c5fQXR6ps2EDs7JPHu-CU7-5qE3EI"
+)
+
+
 # Note: if you'd like to run the full pipeline, you'll need to generate a service account keyfile for an account
 # that has been given write access to the Google Sheet.
-
-
 def extract_transform_and_load_covid_data(post_to_google_sheets=True):
     """Runs the entire pipeline to produce data for Covid Exit Strategy data sources.
 
@@ -188,6 +195,29 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
         )
 
         sleep_and_log()
+
+    # Calculate and upload state summary tab for Policy vs. Trend Charts.
+    policy_vs_trend_df = pd.concat(
+        [
+            transformed_covidtracking_df.loc[
+                :, [LAST_RAN_FIELD, LAST_UPDATED_FIELD, STATE_FIELD, DATE_SOURCE_FIELD]
+            ],
+            transformed_covidtracking_df.filter(regex="pvt-*").rename(
+                lambda column: column.replace("pvt-", ""), axis="columns"
+            ),
+        ],
+        axis=1,
+    )
+    policy_vs_trend_summary_df = calculate_state_summary(
+        transformed_df=policy_vs_trend_df
+    )
+    if post_to_google_sheets:
+        post_dataframe_to_google_sheets(
+            df=policy_vs_trend_summary_df,
+            workbook_key=POLICY_VS_TREND_CHARTS_DATA_WORKBOOK_KEY,
+            tab_name=STATE_SUMMARY_TAB_NAME,
+            credentials=credentials,
+        )
 
 
 if __name__ == "__main__":
