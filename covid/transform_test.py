@@ -7,7 +7,7 @@ from covid.transform import transform_county_data
 
 
 class TransformTest(unittest.TestCase):
-    @unittest.skip("Lots of formatting to fix this, TODO (@patricksheehan)")
+    # @unittest.skip("Lots of formatting to fix this, TODO (@patricksheehan)")
     def test_transform_county_data(self):
         covidatlas_df = pd.read_csv("data/covidatlas_example_subset.csv")
         county_df = transform_county_data(covidatlas_df=covidatlas_df)

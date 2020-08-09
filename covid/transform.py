@@ -251,15 +251,20 @@ COUNTY_LAST_UPDATED_FIELD = "LAST UPDATED"
 COUNTY_STATE_FIELD = "STATE"
 COUNTY_FIELD = "COUNTY"
 COUNTY_FIPS_FIELD = "FIPS"
+COUNTY_TESTED_FIELD = "NEW TESTS"
+COUNTY_TESTED_3DCS_FIELD = "NEW TESTS (3DCS)"
 COUNTY_NEW_CASES_FIELD = "NEW CASES"
 COUNTY_NEW_CASES_3DRA_FIELD = "NEW CASES (3DRA)"
 COUNTY_NEW_CASES_3DCS_FIELD = "NEW CASES (3DCS)"
 COUNTY_NEW_CASES_PM_FIELD = "NEW CASES PER MILLION"
 COUNTY_NEW_CASES_PM_3DRA_FIELD = "NEW CASES PER MILLION (3DRA)"
 COUNTY_NEW_CASES_PM_3DCS_FIELD = "NEW CASES PER MILLION (3DCS)"
-COUNTY_POSITIVITY_FIELD = "POSITIVITY"
-COUNTY_POSITIVITY_3DCS_FIELD = "POSITIVITY (3DCS)"
-COUNTY_POSITIVITY_3DRA_FIELD = "POSITIVITY (3DRA)"
+COUNTY_NEW_CASES_PM_COLOR_FIELD = "NEW CASES PER MILLION COLOR"
+COUNTY_POSITIVITY_FIELD = "COVID+ RATE"
+COUNTY_POSITIVITY_3DCS_FIELD = "COVID+ RATE (3DCS)"
+COUNTY_POSITIVITY_3DRA_FIELD = "COVID+ RATE (3DRA)"
+COUNTY_POSITIVITY_COLOR_FIELD = "COVID+ COLOR"
+
 
 # Define the list of columns for county-level data.
 COUNTY_SUMMARY_COLUMNS = [
@@ -1289,6 +1294,7 @@ def transform_county_data(covidatlas_df):
             "county": COUNTY_FIELD,
             "state": COUNTY_STATE_FIELD,
             "cases": COUNTY_NEW_CASES_FIELD,
+            "tested": COUNTY_TESTED_FIELD,
         }
     )
 
@@ -1297,16 +1303,17 @@ def transform_county_data(covidatlas_df):
         county_df.loc[:, COUNTY_NEW_CASES_FIELD] / population_series * 1e6
     )
 
-    test_series = county_df["tested"]
-    test_series.loc[test_series == 0.0] = np.NaN
+    # NaN intervals where counties report 0 tests to prevent divide by 0.
+    # TODO (patricksheehan): is there a better way to handle this?
+    county_df.loc[county_df[COUNTY_TESTED_FIELD] == 0.0, COUNTY_TESTED_FIELD] = np.NaN
     county_df.loc[:, COUNTY_POSITIVITY_FIELD] = (
-        county_df[COUNTY_NEW_CASES_FIELD] / test_series
+        county_df[COUNTY_NEW_CASES_FIELD] / county_df[COUNTY_TESTED_FIELD]
     )
 
     for column in [
         COUNTY_NEW_CASES_FIELD,
         COUNTY_NEW_CASES_PM_FIELD,
-        COUNTY_POSITIVITY_FIELD,
+        COUNTY_TESTED_FIELD,
     ]:
         print(f"Calculating County 3DCS for {column}.")
 
@@ -1319,6 +1326,10 @@ def transform_county_data(covidatlas_df):
         county_df.loc[:, f"{column} (3DCS)"] = county_df.groupby(COUNTY_FIPS_FIELD)[
             rolling_avg_column
         ].apply(fit_and_predict_cubic_spline_in_r, smoothing_parameter=0.5,)
+
+    county_df.loc[:, COUNTY_POSITIVITY_3DCS_FIELD] = (
+        county_df[COUNTY_NEW_CASES_3DCS_FIELD] / county_df[COUNTY_TESTED_3DCS_FIELD]
+    )
 
     county_df = county_df.reset_index()
 
