@@ -13,6 +13,7 @@ from covid.extract import TOTAL_CASES_SOURCE_FIELD
 from covid.transform_utils import calculate_consecutive_boolean_series
 from covid.transform_utils import calculate_consecutive_positive_or_negative_values
 from covid.transform_utils import calculate_max_run_in_window
+from covid.transform_utils import compute_lagged_frame
 from covid.transform_utils import fit_and_predict_cubic_spline_in_r
 from covid.transform_utils import generate_lag_column_name_formatter_and_column_names
 from covid.transform_utils import generate_lags
@@ -264,7 +265,19 @@ COUNTY_POSITIVITY_FIELD = "COVID+ RATE"
 COUNTY_POSITIVITY_3DCS_FIELD = "COVID+ RATE (3DCS)"
 COUNTY_POSITIVITY_3DRA_FIELD = "COVID+ RATE (3DRA)"
 COUNTY_POSITIVITY_COLOR_FIELD = "COVID+ COLOR"
-
+_COUNTY_NUM_LAGS = 14
+_, _COUNTY_NEW_CASES_LAG_FIELDS = generate_lag_column_name_formatter_and_column_names(
+    column_name=COUNTY_NEW_CASES_3DCS_FIELD, num_lags=_COUNTY_NUM_LAGS
+)
+(
+    _,
+    _COUNTY_NEW_CASES_PM_LAG_FIELDS,
+) = generate_lag_column_name_formatter_and_column_names(
+    column_name=COUNTY_NEW_CASES_PM_3DCS_FIELD, num_lags=_COUNTY_NUM_LAGS
+)
+_, _COUNTY_POSITIVITY_LAG_FIELDS = generate_lag_column_name_formatter_and_column_names(
+    column_name=COUNTY_POSITIVITY_3DCS_FIELD, num_lags=_COUNTY_NUM_LAGS
+)
 
 # Define the list of columns for county-level data.
 COUNTY_SUMMARY_COLUMNS = [
@@ -275,7 +288,9 @@ COUNTY_SUMMARY_COLUMNS = [
     COUNTY_NEW_CASES_3DCS_FIELD,
     COUNTY_NEW_CASES_PM_3DCS_FIELD,
     COUNTY_POSITIVITY_3DCS_FIELD,
-    # *[f"{field} T-{i:02}" for i in range(0, 15) for field in [COUNTY_NEW_CASES_3DCS_FIELD, COUNTY_NEW_CASES_PM_3DCS_FIELD, COUNTY_POSITIVITY_3DCS_FIELD]],
+    *_COUNTY_NEW_CASES_LAG_FIELDS,
+    *_COUNTY_NEW_CASES_PM_LAG_FIELDS,
+    *_COUNTY_POSITIVITY_LAG_FIELDS,
 ]
 
 
@@ -1303,13 +1318,14 @@ def transform_county_data(covidatlas_df):
         county_df.loc[:, COUNTY_NEW_CASES_FIELD] / population_series * 1e6
     )
 
-    # NaN intervals where counties report 0 tests to prevent divide by 0.
-    # TODO (patricksheehan): is there a better way to handle this?
+    # Set tested field to NaN when test counts are 0 to avoid zero-division errors.
+    # TODO (pjsheehan): is there a better way to handle this case?
     county_df.loc[county_df[COUNTY_TESTED_FIELD] == 0.0, COUNTY_TESTED_FIELD] = np.NaN
     county_df.loc[:, COUNTY_POSITIVITY_FIELD] = (
         county_df[COUNTY_NEW_CASES_FIELD] / county_df[COUNTY_TESTED_FIELD]
     )
 
+    # Calculate 3-day cublic spline for important fields
     for column in [
         COUNTY_NEW_CASES_FIELD,
         COUNTY_NEW_CASES_PM_FIELD,
@@ -1319,18 +1335,42 @@ def transform_county_data(covidatlas_df):
 
         # Calculate the 3-day rolling average for the column.
         rolling_avg_column = f"{column} (3DRA)"
+        cublic_spline_column = f"{column} (3DCS)"
         county_df.loc[:, rolling_avg_column] = county_df.groupby(COUNTY_FIPS_FIELD)[
             column
         ].apply(lambda x: x.rolling(window=3, min_periods=1, center=False).mean())
 
-        county_df.loc[:, f"{column} (3DCS)"] = county_df.groupby(COUNTY_FIPS_FIELD)[
+        county_df.loc[:, cublic_spline_column] = county_df.groupby(COUNTY_FIPS_FIELD)[
             rolling_avg_column
         ].apply(fit_and_predict_cubic_spline_in_r, smoothing_parameter=0.5,)
 
+        # NaN rows where the 3DRA is NaN.
+        # Note: this handles a common county-level case where a county simply does not have any testing data.
+        county_df.loc[
+            county_df[rolling_avg_column].isna(), cublic_spline_column
+        ] = np.NaN
+
+    # Calculate the 3-day cublic spline for positivity which uses a 3DCS for tests and cases to avoid large % swings.
     county_df.loc[:, COUNTY_POSITIVITY_3DCS_FIELD] = (
         county_df[COUNTY_NEW_CASES_3DCS_FIELD] / county_df[COUNTY_TESTED_3DCS_FIELD]
     )
 
-    county_df = county_df.reset_index()
+    # Generate lags for important columns.
+    # Join to lags of important variables that we want to plot in sparklines.
+    lag_fields = [
+        COUNTY_NEW_CASES_PM_3DCS_FIELD,
+        COUNTY_NEW_CASES_3DCS_FIELD,
+        COUNTY_POSITIVITY_3DCS_FIELD,
+    ]
+    lag_frame = compute_lagged_frame(
+        county_df,
+        num_periods=range(0, _COUNTY_NUM_LAGS),
+        suffix=" T-",
+        subset=lag_fields,
+    )
+    county_df = pd.concat([county_df, lag_frame], axis=1)
+
+    # Restore FIPS and date as regular columns to integer-id rows.
+    county_df = county_df.reset_index(drop=False)
 
     return county_df

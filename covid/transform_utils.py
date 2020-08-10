@@ -1,4 +1,6 @@
 import datetime
+from functools import partial
+from operator import is_not
 
 import numpy as np
 import pandas as pd
@@ -7,6 +9,78 @@ from scipy import interpolate as interpolate
 
 from covid.extract import DATE_SOURCE_FIELD
 from covid.extract import STATE_FIELD
+
+
+def _filter_not_none(values):
+    """Filters the passed values for ones that are not none.
+
+    Args:
+        values (list): values to filter
+
+    Returns:
+        filtered_values (list): filtered values
+    """
+    filtered_values = list(filter(partial(is_not, None), values))
+    return filtered_values
+
+
+def _reindex_and_rename_columns(frame, index, columns):
+    """Reindexes and renames the columns of the passed data frame.
+
+    Args:
+        frame (pandas.DataFrame): data frame to reindex and rename columns of
+        index (pandas.DatetimeIndex): index to use for reindexing
+        columns (list): columns to use for renaming
+
+    Returns:
+        result_frame (pandas.DataFrame): resulting data frame
+    """
+    result_frame = pd.DataFrame(
+        index=frame.index, columns=columns, data=frame.values
+    ).reindex(index)
+    return result_frame
+
+
+def _create_period_column_names(
+    columns, suffix, period, suffix_level, input_frame_cols
+):
+    """Helper method for compute_lagged_frame and compute_diff_frame that attaches suffixes to a column level.
+
+    Args:
+        columns (list of str or list of tuple of str): new columns - list of str for Index or list of tuple for
+            MultiIndex
+        suffix (str): suffix to add to the columns
+        period (int): amount of lag/differencing to add to columns
+        suffix_level (int): if MultiIndex, level to add the suffixes to
+        input_frame_cols (pd.Index or pd.MultiIndex): the columns of the original input frame
+
+    Returns:
+        new_columns: the newly formatted columns for the output frame
+    """
+    # Check if the original frame had a MultiIndex or not
+    if isinstance(input_frame_cols, pd.MultiIndex):
+        new_columns = [list(col) for col in columns]
+
+        # Add the suffix and period to the specified level of the MultiIndex
+        new_columns = [
+            col[0:suffix_level]
+            + ["".join(map(str, _filter_not_none([col[suffix_level], suffix, period])))]
+            + (col[suffix_level + 1 :] if suffix_level != -1 else [])
+            for col in new_columns
+        ]
+
+        # Create new MultiIndex
+        new_columns = [tuple(col) for col in new_columns]
+        new_columns = pd.MultiIndex.from_tuples(
+            new_columns, names=input_frame_cols.names
+        )
+    else:
+        # Create a new list of columns with the suffix attached
+        new_columns = [
+            "".join(map(str, _filter_not_none([col, suffix, period])))
+            for col in columns
+        ]
+    return new_columns
 
 
 def fit_and_predict_cubic_spline(series_):
@@ -110,9 +184,15 @@ def generate_lag_column_name_formatter_and_column_names(column_name, num_lags=12
     return column_name_formatter, lag_column_names
 
 
-def generate_lags(df, column, num_lags=121, lag_timedelta=datetime.timedelta(days=1)):
+def generate_lags(
+    df,
+    column,
+    by_column=STATE_FIELD,
+    num_lags=121,
+    lag_timedelta=datetime.timedelta(days=1),
+):
     # TODO(lbrown): Refactor this method to be more efficient; this is just the quick and dirty way.
-    states = df[STATE_FIELD].unique()
+    locations = df[by_column].unique()
 
     column_names = [DATE_SOURCE_FIELD]
 
@@ -126,20 +206,20 @@ def generate_lags(df, column, num_lags=121, lag_timedelta=datetime.timedelta(day
     column_names.extend(lag_column_names)
 
     lags_df = pd.DataFrame(
-        index=pd.Index(data=states, name=STATE_FIELD), columns=column_names
+        index=pd.Index(data=locations, name=by_column), columns=column_names
     )
 
     today = pd.to_datetime(df[DATE_SOURCE_FIELD]).max()
     lags_df[DATE_SOURCE_FIELD] = today
-    for state in states:
+    for location in locations:
         # Start each state looking up today.
         date_to_lookup = today
 
         for lag in range(num_lags):
-            print(f"For field {column}, processing {state} for lag {lag}.")
+            print(f"For field {column}, processing {location} for lag {lag}.")
             # Lookup the historical entry.
             value = df.loc[
-                (df[STATE_FIELD] == state) & (df[DATE_SOURCE_FIELD] == date_to_lookup),
+                (df[by_column] == location) & (df[DATE_SOURCE_FIELD] == date_to_lookup),
                 column,
             ]
 
@@ -147,12 +227,50 @@ def generate_lags(df, column, num_lags=121, lag_timedelta=datetime.timedelta(day
                 raise ValueError("Too many or too few values returned.")
             elif len(value) == 1:
                 value = value.iloc[0]
-                lags_df.loc[state, column_name_formatter.format(lag)] = value
+                lags_df.loc[location, column_name_formatter.format(lag)] = value
 
             date_to_lookup = date_to_lookup - lag_timedelta
 
     lags_df = lags_df.reset_index()
     return lags_df
+
+
+def compute_lagged_frame(
+    frame, num_periods, freq=None, suffix=None, suffix_level=None, subset=None
+):
+    """Computes a data frame with columns that contain the lagged values for the existing columns.
+
+    Args:
+        frame (pandas.DataFrame): data frame to compute the lagged values for
+        num_periods (list of int): number of periods that each new feature column should be lagged by
+        freq (str, optional): time frequency to use in the shift (e.g. 'H' for hourly)
+        suffix (str, optional): suffix to use for titles of the new feature columns
+        suffix_level (int, optional): if columns are MultiIndex, which level to add the suffix to
+        subset (list of str, optional): subset of columns to compute lagged values for
+
+    Returns:
+        lagged_frame (pandas.DataFrame): data frame with the lagged values
+    """
+    if subset is None:
+        subset = frame.columns.tolist()
+
+    if suffix_level is None or suffix_level == len(frame.columns.levels):
+        suffix_level = -1
+
+    lagged_frame = pd.concat(
+        [
+            _reindex_and_rename_columns(
+                frame=frame[subset].shift(periods, freq=freq),
+                index=frame.index,
+                columns=_create_period_column_names(
+                    subset, suffix, periods, suffix_level, frame.columns
+                ),
+            )
+            for periods in num_periods
+        ],
+        axis=1,
+    )
+    return lagged_frame
 
 
 def calculate_summary(transformed_df, columns):
