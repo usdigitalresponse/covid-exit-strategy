@@ -17,6 +17,7 @@ from covid.transform_utils import compute_lagged_frame
 from covid.transform_utils import fit_and_predict_cubic_spline_in_r
 from covid.transform_utils import generate_lag_column_name_formatter_and_column_names
 from covid.transform_utils import generate_lags
+from covid.transform_utils import get_color_series_from_range
 
 
 # Define output field names.
@@ -285,12 +286,14 @@ COUNTY_SUMMARY_COLUMNS = [
     COUNTY_STATE_FIELD,
     COUNTY_FIELD,
     COUNTY_FIPS_FIELD,
-    COUNTY_NEW_CASES_3DCS_FIELD,
-    COUNTY_NEW_CASES_PM_3DCS_FIELD,
-    COUNTY_POSITIVITY_3DCS_FIELD,
+    COUNTY_NEW_CASES_PM_COLOR_FIELD,
+    COUNTY_POSITIVITY_COLOR_FIELD,
     *_COUNTY_NEW_CASES_LAG_FIELDS,
+    COUNTY_NEW_CASES_3DCS_FIELD,
     *_COUNTY_NEW_CASES_PM_LAG_FIELDS,
+    COUNTY_NEW_CASES_PM_3DCS_FIELD,
     *_COUNTY_POSITIVITY_LAG_FIELDS,
+    COUNTY_POSITIVITY_3DCS_FIELD,
 ]
 
 
@@ -481,6 +484,22 @@ CRITERIA_COMBINED_SUMMARY_COLUMNS = [
     LAST_RAN_FIELD,
     LAST_UPDATED_FIELD,
 ]
+
+# Define the frontend colors.
+_GREEN = "Green"
+_YELLOW = "Yellow"
+_RED = "Red"
+_DEEP_SHIT = "Dark Red"
+
+# Define the upper bounds for each color for the new cases per million metric.
+_NEW_CASES_PM_COLOR_DICT = dict(
+    _GREEN=(0, 40), _YELLOW=(40, 80), _RED=(80, 150), _DEEP_SHIT=(150, np.inf)
+)
+
+# Define the upper bounds for each color for the positivity metric.
+_POSITIVITY_COLOR_DICT = dict(
+    _GREEN=(0, 0.02), _YELLOW=(0.02, 0.07), _RED=(0.07, 0.1), _DEEP_SHIT=(0.1, np.inf)
+)
 
 
 def transform_covidtracking_data(covidtracking_df):
@@ -1369,6 +1388,15 @@ def transform_county_data(covidatlas_df):
         subset=lag_fields,
     )
     county_df = pd.concat([county_df, lag_frame], axis=1)
+
+    # Calculate the 7-day rolling average color status.
+    county_df.loc[:, COUNTY_NEW_CASES_PM_COLOR_FIELD] = get_color_series_from_range(
+        county_df[COUNTY_NEW_CASES_PM_3DCS_FIELD].rolling("7D").mean(),
+        _NEW_CASES_PM_COLOR_DICT,
+    )
+    county_df.loc[:, COUNTY_POSITIVITY_COLOR_FIELD] = get_color_series_from_range(
+        county_df[COUNTY_POSITIVITY_3DCS_FIELD].rolling("7D").mean()
+    )
 
     # Restore FIPS and date as regular columns to integer-id rows.
     county_df = county_df.reset_index(drop=False)
