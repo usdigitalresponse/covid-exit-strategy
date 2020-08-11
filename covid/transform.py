@@ -492,14 +492,20 @@ _RED = "Red"
 _DEEP_SHIT = "Dark Red"
 
 # Define the upper bounds for each color for the new cases per million metric.
-_NEW_CASES_PM_COLOR_DICT = dict(
-    _GREEN=(0, 40), _YELLOW=(40, 80), _RED=(80, 150), _DEEP_SHIT=(150, np.inf)
-)
+_NEW_CASES_PM_COLOR_DICT = {
+    _GREEN: (0, 40),
+    _YELLOW: (40, 80),
+    _RED: (80, 150),
+    _DEEP_SHIT: (150, np.inf),
+}
 
 # Define the upper bounds for each color for the positivity metric.
-_POSITIVITY_COLOR_DICT = dict(
-    _GREEN=(0, 0.02), _YELLOW=(0.02, 0.07), _RED=(0.07, 0.1), _DEEP_SHIT=(0.1, np.inf)
-)
+_POSITIVITY_COLOR_DICT = {
+    _GREEN: (0, 0.02),
+    _YELLOW: (0.02, 0.07),
+    _RED: (0.07, 0.1),
+    _DEEP_SHIT: (0.1, np.inf),
+}
 
 
 def transform_covidtracking_data(covidtracking_df):
@@ -1391,11 +1397,14 @@ def transform_county_data(covidatlas_df):
 
     # Calculate the 7-day rolling average color status.
     county_df.loc[:, COUNTY_NEW_CASES_PM_COLOR_FIELD] = get_color_series_from_range(
-        county_df[COUNTY_NEW_CASES_PM_3DCS_FIELD].rolling("7D").mean(),
+        county_df[COUNTY_NEW_CASES_PM_3DCS_FIELD]
+        .rolling(window=7, min_periods=1)
+        .mean(),
         _NEW_CASES_PM_COLOR_DICT,
     )
     county_df.loc[:, COUNTY_POSITIVITY_COLOR_FIELD] = get_color_series_from_range(
-        county_df[COUNTY_POSITIVITY_3DCS_FIELD].rolling("7D").mean()
+        county_df[COUNTY_POSITIVITY_3DCS_FIELD].rolling(window=7, min_periods=1).mean(),
+        _POSITIVITY_COLOR_DICT,
     )
 
     # Restore FIPS and date as regular columns to integer-id rows.
