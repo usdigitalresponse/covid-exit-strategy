@@ -1338,17 +1338,16 @@ def transform_county_data(covidatlas_df):
         }
     )
 
-    population_series = county_df["population"]
     county_df.loc[:, COUNTY_NEW_CASES_PM_FIELD] = (
-        county_df.loc[:, COUNTY_NEW_CASES_FIELD] / population_series * 1e6
-    )
+        county_df.loc[:, COUNTY_NEW_CASES_FIELD] / county_df.loc[:, "population"]
+    ) * 1e6
 
     # Set tested field to NaN when test counts are 0 to avoid zero-division errors.
     # TODO (pjsheehan): is there a better way to handle this case?
     county_df.loc[county_df[COUNTY_TESTED_FIELD] == 0.0, COUNTY_TESTED_FIELD] = np.NaN
     county_df.loc[:, COUNTY_POSITIVITY_FIELD] = (
         county_df[COUNTY_NEW_CASES_FIELD] / county_df[COUNTY_TESTED_FIELD]
-    )
+    ) * 100
 
     # Calculate 3-day cublic spline for important fields
     for column in [
@@ -1378,7 +1377,7 @@ def transform_county_data(covidatlas_df):
     # Calculate the 3-day cublic spline for positivity which uses a 3DCS for tests and cases to avoid large % swings.
     county_df.loc[:, COUNTY_POSITIVITY_3DCS_FIELD] = (
         county_df[COUNTY_NEW_CASES_3DCS_FIELD] / county_df[COUNTY_TESTED_3DCS_FIELD]
-    )
+    ) * 100
 
     # Generate lags for important columns.
     # Join to lags of important variables that we want to plot in sparklines.
