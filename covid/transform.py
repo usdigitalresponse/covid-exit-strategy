@@ -1333,11 +1333,14 @@ def transform_county_data(covidatlas_df):
         columns={
             "county": COUNTY_FIELD,
             "state": COUNTY_STATE_FIELD,
-            "cases": COUNTY_NEW_CASES_FIELD,
             "tested": COUNTY_TESTED_FIELD,
         }
     )
 
+    # Calculate the new cases field by differencing the cumulative "cases" field.
+    county_df.loc[:, COUNTY_NEW_CASES_FIELD] = county_df.loc[:, "cases"].diff(periods=1)
+
+    # Calculate the new cases per million field by dividing by population and multiplying by 1MM.
     county_df.loc[:, COUNTY_NEW_CASES_PM_FIELD] = (
         county_df.loc[:, COUNTY_NEW_CASES_FIELD] / county_df.loc[:, "population"]
     ) * 1e6
