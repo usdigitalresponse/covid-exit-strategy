@@ -3,6 +3,8 @@ import datetime
 import numpy as np
 import pandas as pd
 
+from covid.constants import Color
+from covid.constants import COLOR_NAME_MAP
 from covid.extract import DATE_SOURCE_FIELD
 from covid.extract import extract_state_population_data
 from covid.extract import get_state_abbreviations_to_names
@@ -250,34 +252,40 @@ CDC_CRITERIA_6_NEGATIVE_STREAK_STATE_SUMMARY_FIELDS = [
 
 # Define fields for our county-level data.
 COUNTY_LAST_UPDATED_FIELD = "LAST UPDATED"
+COUNTY_POPULATION_FIELD = "POPULATION"
 COUNTY_STATE_FIELD = "STATE"
 COUNTY_FIELD = "COUNTY"
 COUNTY_FIPS_FIELD = "FIPS"
 COUNTY_TESTED_FIELD = "NEW TESTS"
 COUNTY_TESTED_3DCS_FIELD = "NEW TESTS (3DCS)"
+COUNTY_TESTED_7DRA_FIELD = "NEW TESTS (7DRA)"
 COUNTY_NEW_CASES_FIELD = "NEW CASES"
 COUNTY_NEW_CASES_3DRA_FIELD = "NEW CASES (3DRA)"
 COUNTY_NEW_CASES_3DCS_FIELD = "NEW CASES (3DCS)"
+COUNTY_NEW_CASES_7DRA_FIELD = "NEW CASES (7DRA)"
 COUNTY_NEW_CASES_PM_FIELD = "NEW CASES PER MILLION"
 COUNTY_NEW_CASES_PM_3DRA_FIELD = "NEW CASES PER MILLION (3DRA)"
 COUNTY_NEW_CASES_PM_3DCS_FIELD = "NEW CASES PER MILLION (3DCS)"
+COUNTY_NEW_CASES_PM_7DRA_FIELD = "NEW CASES PER MILLION (7DRA)"
 COUNTY_NEW_CASES_PM_COLOR_FIELD = "NEW CASES PER MILLION COLOR"
 COUNTY_POSITIVITY_FIELD = "COVID+ RATE"
 COUNTY_POSITIVITY_3DCS_FIELD = "COVID+ RATE (3DCS)"
 COUNTY_POSITIVITY_3DRA_FIELD = "COVID+ RATE (3DRA)"
+COUNTY_POSITIVITY_7DRA_FIELD = "COVID+ RATE (7DRA)"
 COUNTY_POSITIVITY_COLOR_FIELD = "COVID+ COLOR"
+COUNTY_COLOR_FIELD = "COUNTY COLOR"
 _COUNTY_NUM_LAGS = 14
 _, _COUNTY_NEW_CASES_LAG_FIELDS = generate_lag_column_name_formatter_and_column_names(
-    column_name=COUNTY_NEW_CASES_3DCS_FIELD, num_lags=_COUNTY_NUM_LAGS
+    column_name=COUNTY_NEW_CASES_7DRA_FIELD, num_lags=_COUNTY_NUM_LAGS
 )
 (
     _,
     _COUNTY_NEW_CASES_PM_LAG_FIELDS,
 ) = generate_lag_column_name_formatter_and_column_names(
-    column_name=COUNTY_NEW_CASES_PM_3DCS_FIELD, num_lags=_COUNTY_NUM_LAGS
+    column_name=COUNTY_NEW_CASES_PM_7DRA_FIELD, num_lags=_COUNTY_NUM_LAGS
 )
 _, _COUNTY_POSITIVITY_LAG_FIELDS = generate_lag_column_name_formatter_and_column_names(
-    column_name=COUNTY_POSITIVITY_3DCS_FIELD, num_lags=_COUNTY_NUM_LAGS
+    column_name=COUNTY_POSITIVITY_7DRA_FIELD, num_lags=_COUNTY_NUM_LAGS
 )
 
 # Define the list of columns for county-level data.
@@ -286,14 +294,18 @@ COUNTY_SUMMARY_COLUMNS = [
     COUNTY_STATE_FIELD,
     COUNTY_FIELD,
     COUNTY_FIPS_FIELD,
+    COUNTY_COLOR_FIELD,
     COUNTY_NEW_CASES_PM_COLOR_FIELD,
     COUNTY_POSITIVITY_COLOR_FIELD,
     *_COUNTY_NEW_CASES_LAG_FIELDS,
-    COUNTY_NEW_CASES_3DCS_FIELD,
+    COUNTY_NEW_CASES_7DRA_FIELD,
     *_COUNTY_NEW_CASES_PM_LAG_FIELDS,
-    COUNTY_NEW_CASES_PM_3DCS_FIELD,
+    COUNTY_NEW_CASES_PM_7DRA_FIELD,
     *_COUNTY_POSITIVITY_LAG_FIELDS,
-    COUNTY_POSITIVITY_3DCS_FIELD,
+    COUNTY_POSITIVITY_7DRA_FIELD,
+    COUNTY_TESTED_FIELD,
+    COUNTY_NEW_CASES_FIELD,
+    COUNTY_POPULATION_FIELD,
 ]
 
 
@@ -485,26 +497,20 @@ CRITERIA_COMBINED_SUMMARY_COLUMNS = [
     LAST_UPDATED_FIELD,
 ]
 
-# Define the frontend colors.
-_GREEN = "Green"
-_YELLOW = "Yellow"
-_RED = "Red"
-_DEEP_SHIT = "Dark Red"
-
 # Define the upper bounds for each color for the new cases per million metric.
 _NEW_CASES_PM_COLOR_DICT = {
-    _GREEN: (0, 40),
-    _YELLOW: (40, 80),
-    _RED: (80, 150),
-    _DEEP_SHIT: (150, np.inf),
+    Color.GREEN: (0, 40),
+    Color.YELLOW: (40, 80),
+    Color.RED: (80, 150),
+    Color.DARK_RED: (150, np.inf),
 }
 
 # Define the upper bounds for each color for the positivity metric.
 _POSITIVITY_COLOR_DICT = {
-    _GREEN: (0, 0.02),
-    _YELLOW: (0.02, 0.07),
-    _RED: (0.07, 0.1),
-    _DEEP_SHIT: (0.1, np.inf),
+    Color.GREEN: (0, 0.02),
+    Color.YELLOW: (0.02, 0.07),
+    Color.RED: (0.07, 0.1),
+    Color.DARK_RED: (0.1, np.inf),
 }
 
 
@@ -1334,6 +1340,7 @@ def transform_county_data(covidatlas_df):
             "county": COUNTY_FIELD,
             "state": COUNTY_STATE_FIELD,
             "tested": COUNTY_TESTED_FIELD,
+            "population": COUNTY_POPULATION_FIELD,
         }
     )
 
@@ -1342,7 +1349,8 @@ def transform_county_data(covidatlas_df):
 
     # Calculate the new cases per million field by dividing by population and multiplying by 1MM.
     county_df.loc[:, COUNTY_NEW_CASES_PM_FIELD] = (
-        county_df.loc[:, COUNTY_NEW_CASES_FIELD] / county_df.loc[:, "population"]
+        county_df.loc[:, COUNTY_NEW_CASES_FIELD]
+        / county_df.loc[:, COUNTY_POPULATION_FIELD]
     ) * 1e6
 
     # Set tested field to NaN when test counts are 0 to avoid zero-division errors.
@@ -1382,31 +1390,57 @@ def transform_county_data(covidatlas_df):
         county_df[COUNTY_NEW_CASES_3DCS_FIELD] / county_df[COUNTY_TESTED_3DCS_FIELD]
     ) * 100
 
-    # Generate lags for important columns.
-    # Join to lags of important variables that we want to plot in sparklines.
+    # Calculate rolling averages for important fields
+    rolling_avg_frame = (
+        county_df.loc[
+            :, [COUNTY_NEW_CASES_FIELD, COUNTY_NEW_CASES_PM_FIELD, COUNTY_TESTED_FIELD]
+        ]
+        .rolling(window=7, min_periods=1)
+        .mean()
+    )
+    rolling_avg_frame = rolling_avg_frame.add_suffix(" (7DRA)")
+    county_df = pd.concat([county_df, rolling_avg_frame], axis=1)
+
+    # Calculate the rolling average for positivity separately based on the average of tests and cases.
+    county_df.loc[:, COUNTY_POSITIVITY_7DRA_FIELD] = (
+        county_df[COUNTY_NEW_CASES_7DRA_FIELD] / county_df[COUNTY_TESTED_7DRA_FIELD]
+    ) * 100
+
+    # Generate lags for important columns..
     lag_fields = [
-        COUNTY_NEW_CASES_PM_3DCS_FIELD,
-        COUNTY_NEW_CASES_3DCS_FIELD,
-        COUNTY_POSITIVITY_3DCS_FIELD,
+        COUNTY_NEW_CASES_PM_7DRA_FIELD,
+        COUNTY_NEW_CASES_7DRA_FIELD,
+        COUNTY_POSITIVITY_7DRA_FIELD,
     ]
     lag_frame = compute_lagged_frame(
         county_df,
-        num_periods=range(0, _COUNTY_NUM_LAGS),
+        num_periods=list(range(0, _COUNTY_NUM_LAGS)),
         suffix=" T-",
         subset=lag_fields,
     )
     county_df = pd.concat([county_df, lag_frame], axis=1)
 
     # Calculate the 7-day rolling average color status.
-    county_df.loc[:, COUNTY_NEW_CASES_PM_COLOR_FIELD] = get_color_series_from_range(
-        county_df[COUNTY_NEW_CASES_PM_3DCS_FIELD]
-        .rolling(window=7, min_periods=1)
-        .mean(),
-        _NEW_CASES_PM_COLOR_DICT,
+    cases_pm_color_series = get_color_series_from_range(
+        county_df[COUNTY_NEW_CASES_PM_7DRA_FIELD], _NEW_CASES_PM_COLOR_DICT,
     )
-    county_df.loc[:, COUNTY_POSITIVITY_COLOR_FIELD] = get_color_series_from_range(
-        county_df[COUNTY_POSITIVITY_3DCS_FIELD].rolling(window=7, min_periods=1).mean(),
-        _POSITIVITY_COLOR_DICT,
+    county_df.loc[:, COUNTY_NEW_CASES_PM_COLOR_FIELD] = cases_pm_color_series.transform(
+        lambda x: COLOR_NAME_MAP.get(x)
+    )
+
+    positivity_color_series = get_color_series_from_range(
+        county_df[COUNTY_POSITIVITY_7DRA_FIELD], _POSITIVITY_COLOR_DICT,
+    )
+    county_df.loc[:, COUNTY_POSITIVITY_COLOR_FIELD] = positivity_color_series.transform(
+        lambda x: COLOR_NAME_MAP.get(x)
+    )
+
+    # Calculate the overall county color by taking the max of new cases pm and positivity.
+    county_color_series = cases_pm_color_series.combine(
+        positivity_color_series, func=max
+    )
+    county_df.loc[:, COUNTY_COLOR_FIELD] = county_color_series.transform(
+        lambda x: COLOR_NAME_MAP.get(x)
     )
 
     # Restore FIPS and date as regular columns to integer-id rows.
