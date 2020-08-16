@@ -301,7 +301,7 @@ def calculate_consecutive_boolean_series(boolean_series):
 def get_color_series_from_range(series, color_range_dict):
     """Takes a series of values and a dictionary mapping colors to tuples of (lower_bound, upper_bound) and returns
     a series of color labels associated with the values in series based on the ranges in the dict."""
-    color_series = pd.Series(data="", index=series.index)
+    color_series = pd.Series(data=np.NaN, index=series.index)
     for color, (lower_bound, upper_bound) in color_range_dict.items():
         color_series.loc[(series >= lower_bound) & (series < upper_bound)] = color
     color_series.loc[series.isna()] = np.NaN

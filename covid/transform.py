@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 import numpy as np
 import pandas as pd
@@ -21,6 +22,7 @@ from covid.transform_utils import generate_lag_column_name_formatter_and_column_
 from covid.transform_utils import generate_lags
 from covid.transform_utils import get_color_series_from_range
 
+logger = logging.getLogger(__name__)
 
 # Define output field names.
 # Criteria Category 1 Fields.
@@ -544,7 +546,7 @@ def transform_covidtracking_data(covidtracking_df):
     state_population_data = extract_state_population_data()
 
     for state in states:
-        print(f"Processing covid tracking data for state {state}...")
+        logger.info(f"Processing covid tracking data for state {state}...")
 
         ###### Calculate criteria category 1. ######
         # Calculate new cases (raw).
@@ -1066,7 +1068,7 @@ def transform_cdc_ili_data(ili_df):
     ili_df[PERCENT_ILI] = ili_df[PERCENT_ILI].astype(float)
 
     for state in states:
-        print(f"Processing CDC ILI data for state {state}...")
+        logger.info(f"Processing CDC ILI data for state {state}...")
 
         ###### Calculate criteria category 5. ######
         # Calculate total cases (spline).
@@ -1232,7 +1234,7 @@ def transform_cdc_beds_data(cdc_beds_current_df, cdc_beds_historical_df):
     states = cdc_df.index.get_level_values(STATE_FIELD).unique()
     state_dfs = []
     for state in states:
-        print(f"Transforming CDC beds data for state {state}...")
+        logger.info(f"Transforming CDC beds data for state {state}...")
         state_df = cdc_df.xs(state, axis=0, level=STATE_FIELD)
         state_df[MAX_INPATIENT_BED_OCCUPATION_7_DAYS] = (
             state_df[INPATIENT_PERCENT_OCCUPIED]
@@ -1333,6 +1335,7 @@ def transform_county_data(covidatlas_df):
     county_df = county_df.loc["2020-07-10":]
 
     county_df = county_df.set_index(COUNTY_FIPS_FIELD, append=True)
+    county_df = county_df.sort_index(level=DATE_SOURCE_FIELD)
 
     # Rename primary columns.
     county_df = county_df.rename(
@@ -1345,7 +1348,9 @@ def transform_county_data(covidatlas_df):
     )
 
     # Calculate the new cases field by differencing the cumulative "cases" field.
-    county_df.loc[:, COUNTY_NEW_CASES_FIELD] = county_df.loc[:, "cases"].diff(periods=1)
+    county_df.loc[:, COUNTY_NEW_CASES_FIELD] = (
+        county_df.loc[:, "cases"].groupby(COUNTY_FIPS_FIELD).diff(periods=1)
+    )
 
     # Calculate the new cases per million field by dividing by population and multiplying by 1MM.
     county_df.loc[:, COUNTY_NEW_CASES_PM_FIELD] = (
@@ -1360,43 +1365,13 @@ def transform_county_data(covidatlas_df):
         county_df[COUNTY_NEW_CASES_FIELD] / county_df[COUNTY_TESTED_FIELD]
     ) * 100
 
-    # Calculate 3-day cublic spline for important fields
-    for column in [
-        COUNTY_NEW_CASES_FIELD,
-        COUNTY_NEW_CASES_PM_FIELD,
-        COUNTY_TESTED_FIELD,
-    ]:
-        print(f"Calculating County 3DCS for {column}.")
-
-        # Calculate the 3-day rolling average for the column.
-        rolling_avg_column = f"{column} (3DRA)"
-        cublic_spline_column = f"{column} (3DCS)"
-        county_df.loc[:, rolling_avg_column] = county_df.groupby(COUNTY_FIPS_FIELD)[
-            column
-        ].apply(lambda x: x.rolling(window=3, min_periods=1, center=False).mean())
-
-        county_df.loc[:, cublic_spline_column] = county_df.groupby(COUNTY_FIPS_FIELD)[
-            rolling_avg_column
-        ].apply(fit_and_predict_cubic_spline_in_r, smoothing_parameter=0.5,)
-
-        # NaN rows where the 3DRA is NaN.
-        # Note: this handles a common county-level case where a county simply does not have any testing data.
-        county_df.loc[
-            county_df[rolling_avg_column].isna(), cublic_spline_column
-        ] = np.NaN
-
-    # Calculate the 3-day cublic spline for positivity which uses a 3DCS for tests and cases to avoid large % swings.
-    county_df.loc[:, COUNTY_POSITIVITY_3DCS_FIELD] = (
-        county_df[COUNTY_NEW_CASES_3DCS_FIELD] / county_df[COUNTY_TESTED_3DCS_FIELD]
-    ) * 100
-
     # Calculate rolling averages for important fields
     rolling_avg_frame = (
         county_df.loc[
             :, [COUNTY_NEW_CASES_FIELD, COUNTY_NEW_CASES_PM_FIELD, COUNTY_TESTED_FIELD]
         ]
-        .rolling(window=7, min_periods=1)
-        .mean()
+        .groupby(level=COUNTY_FIPS_FIELD)
+        .apply(lambda x: x.rolling(window=7, min_periods=1).mean())
     )
     rolling_avg_frame = rolling_avg_frame.add_suffix(" (7DRA)")
     county_df = pd.concat([county_df, rolling_avg_frame], axis=1)
@@ -1445,5 +1420,11 @@ def transform_county_data(covidatlas_df):
 
     # Restore FIPS and date as regular columns to integer-id rows.
     county_df = county_df.reset_index(drop=False)
+
+    # Reduce the dataset to the most recent data by county.
+    county_df = county_df.loc[county_df.groupby(COUNTY_FIPS_FIELD).date.idxmax(), :]
+
+    # Reduce the dataset to the summary columns.
+    county_df = county_df.loc[:, COUNTY_SUMMARY_COLUMNS]
 
     return county_df
