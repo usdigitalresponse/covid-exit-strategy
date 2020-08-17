@@ -258,7 +258,7 @@ COUNTY_POPULATION_FIELD = "POPULATION"
 COUNTY_STATE_FIELD = "STATE"
 COUNTY_FIELD = "COUNTY"
 COUNTY_FIPS_FIELD = "FIPS"
-COUNTY_TESTED_FIELD = "NEW TESTS"
+COUNTY_NEW_TESTS_FIELD = "NEW TESTS"
 COUNTY_TESTED_3DCS_FIELD = "NEW TESTS (3DCS)"
 COUNTY_TESTED_7DRA_FIELD = "NEW TESTS (7DRA)"
 COUNTY_NEW_CASES_FIELD = "NEW CASES"
@@ -305,7 +305,7 @@ COUNTY_SUMMARY_COLUMNS = [
     COUNTY_NEW_CASES_PM_7DRA_FIELD,
     *_COUNTY_POSITIVITY_LAG_FIELDS,
     COUNTY_POSITIVITY_7DRA_FIELD,
-    COUNTY_TESTED_FIELD,
+    COUNTY_NEW_TESTS_FIELD,
     COUNTY_NEW_CASES_FIELD,
     COUNTY_POPULATION_FIELD,
 ]
@@ -1342,14 +1342,16 @@ def transform_county_data(covidatlas_df):
         columns={
             "county": COUNTY_FIELD,
             "state": COUNTY_STATE_FIELD,
-            "tested": COUNTY_TESTED_FIELD,
             "population": COUNTY_POPULATION_FIELD,
         }
     )
 
-    # Calculate the new cases field by differencing the cumulative "cases" field.
+    # Calculate the new cases and test fields by differencing the cumulative fields.
     county_df.loc[:, COUNTY_NEW_CASES_FIELD] = (
         county_df.loc[:, "cases"].groupby(COUNTY_FIPS_FIELD).diff(periods=1)
+    )
+    county_df.loc[:, COUNTY_NEW_TESTS_FIELD] = (
+        county_df.loc[:, "tested"].groupby(COUNTY_FIPS_FIELD).diff(periods=1)
     )
 
     # Calculate the new cases per million field by dividing by population and multiplying by 1MM.
@@ -1360,15 +1362,18 @@ def transform_county_data(covidatlas_df):
 
     # Set tested field to NaN when test counts are 0 to avoid zero-division errors.
     # TODO (pjsheehan): is there a better way to handle this case?
-    county_df.loc[county_df[COUNTY_TESTED_FIELD] == 0.0, COUNTY_TESTED_FIELD] = np.NaN
+    county_df.loc[
+        county_df[COUNTY_NEW_TESTS_FIELD] == 0.0, COUNTY_NEW_TESTS_FIELD
+    ] = np.NaN
     county_df.loc[:, COUNTY_POSITIVITY_FIELD] = (
-        county_df[COUNTY_NEW_CASES_FIELD] / county_df[COUNTY_TESTED_FIELD]
+        county_df[COUNTY_NEW_CASES_FIELD] / county_df[COUNTY_NEW_TESTS_FIELD]
     ) * 100
 
     # Calculate rolling averages for important fields
     rolling_avg_frame = (
         county_df.loc[
-            :, [COUNTY_NEW_CASES_FIELD, COUNTY_NEW_CASES_PM_FIELD, COUNTY_TESTED_FIELD]
+            :,
+            [COUNTY_NEW_CASES_FIELD, COUNTY_NEW_CASES_PM_FIELD, COUNTY_NEW_TESTS_FIELD],
         ]
         .groupby(level=COUNTY_FIPS_FIELD)
         .apply(lambda x: x.rolling(window=7, min_periods=1).mean())
@@ -1387,13 +1392,17 @@ def transform_county_data(covidatlas_df):
         COUNTY_NEW_CASES_7DRA_FIELD,
         COUNTY_POSITIVITY_7DRA_FIELD,
     ]
-    lag_frame = compute_lagged_frame(
-        county_df,
-        num_periods=list(range(0, _COUNTY_NUM_LAGS)),
-        suffix=" T-",
-        subset=lag_fields,
+    lag_frame = county_df.groupby(level=COUNTY_FIPS_FIELD).apply(
+        lambda x: compute_lagged_frame(
+            x,
+            num_periods=list(range(0, _COUNTY_NUM_LAGS)),
+            suffix=" T-",
+            subset=lag_fields,
+        )
     )
     county_df = pd.concat([county_df, lag_frame], axis=1)
+
+    # county_df.xs("06037", level="FIPS")[[COUNTY_NEW_CASES_7DRA_FIELD, *_COUNTY_NEW_CASES_LAG_FIELDS]]
 
     # Calculate the 7-day rolling average color status.
     cases_pm_color_series = get_color_series_from_range(
@@ -1421,8 +1430,11 @@ def transform_county_data(covidatlas_df):
     # Restore FIPS and date as regular columns to integer-id rows.
     county_df = county_df.reset_index(drop=False)
 
-    # Reduce the dataset to the most recent data by county.
-    county_df = county_df.loc[county_df.groupby(COUNTY_FIPS_FIELD).date.idxmax(), :]
+    # Reduce the dataset to the 2nd most recent data by county.
+    # Note: this is because the most recent data from covidatlas is sometimes incorrect.
+    county_df = county_df.sort_values(DATE_SOURCE_FIELD, ascending=False)
+    county_df = county_df.groupby(COUNTY_FIPS_FIELD).nth(2)
+    county_df = county_df.reset_index(drop=False)
 
     # Reduce the dataset to the summary columns.
     county_df = county_df.loc[:, COUNTY_SUMMARY_COLUMNS]
