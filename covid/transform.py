@@ -509,10 +509,10 @@ _NEW_CASES_PM_COLOR_DICT = {
 
 # Define the upper bounds for each color for the positivity metric.
 _POSITIVITY_COLOR_DICT = {
-    Color.GREEN: (0, 0.02),
-    Color.YELLOW: (0.02, 0.07),
-    Color.RED: (0.07, 0.1),
-    Color.DARK_RED: (0.1, np.inf),
+    Color.GREEN: (0, 2),
+    Color.YELLOW: (2, 7),
+    Color.RED: (7, 10),
+    Color.DARK_RED: (10, np.inf),
 }
 
 
