@@ -10,7 +10,7 @@ class TransformTest(unittest.TestCase):
     # @unittest.skip("Lots of formatting to fix this, TODO (@patricksheehan)")
     def test_transform_county_data(self):
         covidatlas_df = pd.read_csv("test_fixtures/covidatlas_example_subset.csv")
-        county_df = transform_county_data(covidatlas_df=covidatlas_df)
+        county_df = transform_county_data(covidcounty_df=covidatlas_df)
         expected_county_df = pd.read_csv(
             "test_fixtures/expected_county_df_example.csv",
         )

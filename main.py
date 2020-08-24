@@ -6,7 +6,7 @@ import os
 import pandas as pd
 
 from covid.constants import PATH_TO_SERVICE_ACCOUNT_KEY
-from covid.extract import extract_covid_atlas_data
+from covid.extract import extract_covidcounty_data
 from covid.load import get_sheets_client
 from covid.load import post_dataframe_to_google_sheets
 from covid.load_utils import sleep_and_log
@@ -89,11 +89,12 @@ def extract_transform_and_load_covid_data(post_to_google_sheets=True):
     #     credentials=credentials,
     # )
 
-    covidatlas_df = extract_covid_atlas_data()
+    # covidatlas_df = extract_covid_atlas_data()
+    county_df = extract_covidcounty_data()
     # covidtracking_df = extract_covidtracking_historical_data()
     # cdc_ili_df = extract_cdc_ili_data()
 
-    transformed_county_df = transform_county_data(covidatlas_df)
+    transformed_county_df = transform_county_data(county_df)
     # transformed_cdc_ili_df = transform_cdc_ili_data(ili_df=cdc_ili_df)
     # transformed_covidtracking_df = transform_covidtracking_data(
     #     covidtracking_df=covidtracking_df

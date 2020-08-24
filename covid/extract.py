@@ -4,6 +4,7 @@ from io import BytesIO
 
 import pandas as pd
 import requests
+from covidcountydata import Client
 from df2gspread import gspread2df
 
 import covid.extract_config.cdc_govcloud as cgc
@@ -32,6 +33,9 @@ CATEGORY_3_HISTORICAL_DATA_TAB = "Historical Data"
 
 # Define the url used for covidatlas.com which we use for county-level data.
 _COVID_ATLAS_TIME_SERIES_URL = "https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/timeseries.csv"
+
+# Define the API key for covidcountydata
+_COVID_COUNTY_DATA_API_KEY = "AWWjV0egkRXe8GPm6JAB3NrUHRW3VDAe"
 
 logger = logging.getLogger(__name__)
 
@@ -215,3 +219,17 @@ def extract_covid_atlas_data():
     historical_df = pd.read_csv(_COVID_ATLAS_TIME_SERIES_URL)
     logger.info("Finished downloading Covid Atlas data.")
     return historical_df
+
+
+def extract_covidcounty_data():
+    logger.info("Downloading county-level data")
+    c = Client(apikey=_COVID_COUNTY_DATA_API_KEY)
+    counties_df = c.counties
+    two_weeks_ago = pd.Timestamp.utcnow() - pd.Timedelta("14D")
+    c.covid_us(location=">1000", dt=f">{two_weeks_ago.date()}").demographics(
+        variable="Total population"
+    )
+    covid_df = c.fetch()
+    combined_df = pd.merge(counties_df, covid_df, on="location")
+    logger.info("Finished downloading county-level data")
+    return combined_df

@@ -1311,19 +1311,27 @@ def indication_of_rebound(series_):
     return indicator
 
 
-def transform_county_data(covidatlas_df):
+def transform_county_data(covidcounty_df):
     """Takes a df with historical county-level observations and generates a df in our desired format with computed
     columns.
     """
     # Limit results to US counties.
-    county_df = covidatlas_df[
-        (covidatlas_df["level"] == "county")
-        & (covidatlas_df["country"] == "United States")
-    ]
+    county_df = covidcounty_df.copy()
 
-    # Parse FIPS because we'll use this for maps as an index (instead of county name).
-    county_df.loc[:, COUNTY_FIPS_FIELD] = county_df["locationID"].transform(
-        lambda x: x.split("#")[-1].replace("fips:", "")
+    # Rename primary columns.
+    county_df = county_df.rename(
+        columns={
+            "location": COUNTY_FIPS_FIELD,
+            "name": COUNTY_FIELD,
+            "dt": DATE_SOURCE_FIELD,
+            "state": COUNTY_STATE_FIELD,
+            "Total population": COUNTY_POPULATION_FIELD,
+        }
+    )
+
+    # covidcounty stores FIPS as integers....
+    county_df.loc[:, COUNTY_FIPS_FIELD] = county_df[COUNTY_FIPS_FIELD].transform(
+        lambda x: "{0:0>5}".format(x)
     )
 
     # Set date index.
@@ -1331,27 +1339,18 @@ def transform_county_data(covidatlas_df):
     county_df.loc[:, DATE_SOURCE_FIELD] = county_df[DATE_SOURCE_FIELD].astype(str)
     county_df.loc[:, DATE_SOURCE_FIELD] = pd.to_datetime(county_df[DATE_SOURCE_FIELD])
     county_df = county_df.set_index(DATE_SOURCE_FIELD)
-    # TODO (patricksheehan): remove this filter when we want to store more historical data
-    county_df = county_df.loc["2020-07-10":]
+    county_df.index = county_df.index.tz_localize("UTC")
 
+    # Set FIPS index.
     county_df = county_df.set_index(COUNTY_FIPS_FIELD, append=True)
     county_df = county_df.sort_index(level=DATE_SOURCE_FIELD)
 
-    # Rename primary columns.
-    county_df = county_df.rename(
-        columns={
-            "county": COUNTY_FIELD,
-            "state": COUNTY_STATE_FIELD,
-            "population": COUNTY_POPULATION_FIELD,
-        }
-    )
-
     # Calculate the new cases and test fields by differencing the cumulative fields.
     county_df.loc[:, COUNTY_NEW_CASES_FIELD] = (
-        county_df.loc[:, "cases"].groupby(COUNTY_FIPS_FIELD).diff(periods=1)
+        county_df.loc[:, "cases_total"].groupby(COUNTY_FIPS_FIELD).diff(periods=1)
     )
     county_df.loc[:, COUNTY_NEW_TESTS_FIELD] = (
-        county_df.loc[:, "tested"].groupby(COUNTY_FIPS_FIELD).diff(periods=1)
+        county_df.loc[:, "tests_total"].groupby(COUNTY_FIPS_FIELD).diff(periods=1)
     )
 
     # Calculate the new cases per million field by dividing by population and multiplying by 1MM.
@@ -1401,8 +1400,6 @@ def transform_county_data(covidatlas_df):
         )
     )
     county_df = pd.concat([county_df, lag_frame], axis=1)
-
-    # county_df.xs("06037", level="FIPS")[[COUNTY_NEW_CASES_7DRA_FIELD, *_COUNTY_NEW_CASES_LAG_FIELDS]]
 
     # Calculate the 7-day rolling average color status.
     cases_pm_color_series = get_color_series_from_range(
