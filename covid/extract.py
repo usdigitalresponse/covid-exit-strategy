@@ -224,12 +224,10 @@ def extract_covid_atlas_data():
 def extract_covidcounty_data():
     logger.info("Downloading county-level data")
     c = Client(apikey=_COVID_COUNTY_DATA_API_KEY)
-    counties_df = c.counties
     two_weeks_ago = pd.Timestamp.utcnow() - pd.Timedelta("14D")
     c.covid_us(location=">1000", dt=f">{two_weeks_ago.date()}").demographics(
         variable="Total population"
-    )
+    ).us_counties()
     covid_df = c.fetch()
-    combined_df = pd.merge(counties_df, covid_df, on="location")
     logger.info("Finished downloading county-level data")
-    return combined_df
+    return covid_df

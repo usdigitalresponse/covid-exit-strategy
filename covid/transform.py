@@ -1322,9 +1322,9 @@ def transform_county_data(covidcounty_df):
     county_df = county_df.rename(
         columns={
             "location": COUNTY_FIPS_FIELD,
-            "name": COUNTY_FIELD,
+            "county_name": COUNTY_FIELD,
             "dt": DATE_SOURCE_FIELD,
-            "state": COUNTY_STATE_FIELD,
+            "state_name": COUNTY_STATE_FIELD,
             "Total population": COUNTY_POPULATION_FIELD,
         }
     )
