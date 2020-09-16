@@ -110,59 +110,74 @@ def generate_lag_column_name_formatter_and_column_names(column_name, num_lags=12
     return column_name_formatter, lag_column_names
 
 
-def generate_lags(df, column, num_lags=121, lag_timedelta=datetime.timedelta(days=1)):
+def generate_lags(
+    df,
+    column,
+    num_lags=121,
+    lag_timedelta=datetime.timedelta(days=1),
+    suffix_with_date=False,
+    date_format="%Y-%m-%d",
+):
     # TODO(lbrown): Refactor this method to be more efficient; this is just the quick and dirty way.
     states = df[STATE_FIELD].unique()
 
-    column_names = [DATE_SOURCE_FIELD]
-
-    (
-        column_name_formatter,
-        lag_column_names,
-    ) = generate_lag_column_name_formatter_and_column_names(
-        column_name=column, num_lags=num_lags
-    )
-
-    column_names.extend(lag_column_names)
-
+    # Create an empty dataframe to populate with lags.
     lags_df = pd.DataFrame(
-        index=pd.Index(data=states, name=STATE_FIELD), columns=column_names
+        index=pd.Index(data=states, name=STATE_FIELD), columns=[DATE_SOURCE_FIELD]
     )
 
-    today = pd.to_datetime(df[DATE_SOURCE_FIELD]).max()
-    lags_df[DATE_SOURCE_FIELD] = today
-    for state in states:
-        # Start each state looking up today.
-        date_to_lookup = today
+    # Calculate the latest date in the given data frame.
+    latest_date = pd.to_datetime(df[DATE_SOURCE_FIELD]).max()
+    lags_df[DATE_SOURCE_FIELD] = latest_date
 
-        for lag in range(num_lags):
-            print(f"For field {column}, processing {state} for lag {lag}.")
+    for state in states:
+        # Start each state looking up the latest date we have.
+        current_date = latest_date
+
+        for current_lag in range(num_lags):
+            print(f"For field {column}, processing {state} for lag {current_lag}.")
+
             # Lookup the historical entry.
             value = df.loc[
-                (df[STATE_FIELD] == state) & (df[DATE_SOURCE_FIELD] == date_to_lookup),
+                (df[STATE_FIELD] == state)
+                & (pd.to_datetime(df[DATE_SOURCE_FIELD]) == current_date),
                 column,
             ]
 
+            # Ensure only one value is returned.
             if len(value) > 1:
-                raise ValueError("Too many or too few values returned.")
+                raise ValueError("Too many values returned.")
             elif len(value) == 1:
                 value = value.iloc[0]
-                lags_df.loc[state, column_name_formatter.format(lag)] = value
+            else:
+                value = None
 
-            date_to_lookup = date_to_lookup - lag_timedelta
+            if suffix_with_date:
+                current_lag_column = f"{column}-{current_date.strftime(date_format)}"
+            else:
+                current_lag_column = f"{column} T-{current_lag}"
+
+            # Add the current lag column.
+            lags_df.loc[state, current_lag_column] = value
+
+            # Decrement the current date by the lag amount.
+            current_date = current_date - lag_timedelta
 
     lags_df = lags_df.reset_index()
     return lags_df
 
 
-def calculate_state_summary(transformed_df, columns):
+def calculate_state_summary(transformed_df, columns=None):
     # Find current date, and drop all other rows.
     current_date = transformed_df.loc[:, DATE_SOURCE_FIELD].max()
 
     state_summary_df = transformed_df.copy()
     state_summary_df = state_summary_df.loc[
-        state_summary_df[DATE_SOURCE_FIELD] == current_date, columns
+        state_summary_df[DATE_SOURCE_FIELD] == current_date, :
     ]
+
+    if columns is not None:
+        state_summary_df = state_summary_df.loc[:, columns]
 
     return state_summary_df
 

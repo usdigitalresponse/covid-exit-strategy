@@ -16,6 +16,8 @@ from covid.transform_utils import fit_and_predict_cubic_spline_in_r
 from covid.transform_utils import generate_lag_column_name_formatter_and_column_names
 from covid.transform_utils import generate_lags
 
+# Define miscellaneous constants.
+ONE_MILLION = 1_000_000
 
 # Define output field names.
 # Criteria Category 1 Fields.
@@ -134,6 +136,11 @@ MAX_PERCENT_POSITIVE_TESTS_14_DAYS_3D_FIELD = (
     "Highest % Positive (14 day window, 3-day average)"
 )
 CDC_CRITERIA_6A_14_DAY_MAX_PERCENT_POSITIVE = "CDC Criteria 6A"
+
+# Policy vs. Trend charts data fields.
+POLICY_VS_TREND_RAW_CASES_PER_MILLION = "pvt-cases-per-million-raw"
+POLICY_VS_TREND_3DCS_CASES_PER_MILLION = "pvt-cases-per-million-3dcs"
+POLICY_VS_TREND_3DCS_POSITIVITY = "pvt-positivity-3dcs"
 
 # Other fields
 CDC_CRITERIA_ALL_COMBINED_FIELD = "cdc_criteria_all_combined"
@@ -886,6 +893,25 @@ def transform_covidtracking_data(covidtracking_df):
                 ),
             ] = negative_streak_series.values
 
+        # Calculate policy vs. trend charts data.
+        # Calculate raw cases per million.
+        covidtracking_df.loc[(state,), POLICY_VS_TREND_RAW_CASES_PER_MILLION] = (
+            covidtracking_df.loc[(state,), NEW_CASES_FIELD].values / state_population
+        ) * ONE_MILLION
+
+        # Calculate 3DCS cases per million.
+        covidtracking_df.loc[(state,), POLICY_VS_TREND_3DCS_CASES_PER_MILLION] = (
+            covidtracking_df.loc[(state,), NEW_CASES_3DCS_FIELD].values
+            / state_population
+        ) * ONE_MILLION
+
+        # Calculate positivity 3DCS.
+        covidtracking_df.loc[
+            (state,), POLICY_VS_TREND_3DCS_POSITIVITY
+        ] = covidtracking_df.loc[
+            (state,), FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD
+        ].values
+
     # Add an update time.
     covidtracking_df[LAST_RAN_FIELD] = datetime.datetime.now()
 
@@ -896,13 +922,19 @@ def transform_covidtracking_data(covidtracking_df):
     covidtracking_df[LAST_UPDATED_FIELD] = covidtracking_df[DATE_SOURCE_FIELD]
 
     # Join to lags of important variables that we want to plot in sparklines.
-    for field_to_lag, num_lags in [
-        (NEW_CASES_3DCS_FIELD, 121),
-        (PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD, 31),
-        (NEW_TESTS_TOTAL_3DCS_FIELD, 31),
+    for field_to_lag, num_lags, suffix_with_date in [
+        (NEW_CASES_3DCS_FIELD, 121, False),
+        (PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD, 31, False),
+        (NEW_TESTS_TOTAL_3DCS_FIELD, 31, False),
+        (POLICY_VS_TREND_RAW_CASES_PER_MILLION, 300, True),
+        (POLICY_VS_TREND_3DCS_CASES_PER_MILLION, 300, True),
+        (POLICY_VS_TREND_3DCS_POSITIVITY, 300, True),
     ]:
         lags = generate_lags(
-            df=covidtracking_df, column=field_to_lag, num_lags=num_lags
+            df=covidtracking_df,
+            column=field_to_lag,
+            num_lags=num_lags,
+            suffix_with_date=suffix_with_date,
         )
         covidtracking_df = covidtracking_df.merge(
             right=lags, on=[STATE_FIELD, DATE_SOURCE_FIELD], how="left"
