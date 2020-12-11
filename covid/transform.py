@@ -1,5 +1,6 @@
 import datetime
 
+import numpy as np
 import pandas as pd
 
 from covid.extract import DATE_SOURCE_FIELD
@@ -695,12 +696,29 @@ def transform_covidtracking_data(covidtracking_df):
             / covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_FIELD]
         ).values
 
+        # Note: `covidtracking.com` has been returning `nan` values for the `negativeIncrease` signal for Hawaii since
+        #   October 8th. This has resulted in our 3DCS to go haywire. This field depends on those 3DCS so we mask it to
+        #   prevent bad data from showing up on the site.
+        if state == "Hawaii":
+            # Note: This is incredibly hacky but I couldn't figure out a way to make `pd.IndexSlice["2020-10": ]`
+            #   include the last value but doing this does.
+            covidtracking_df.loc[
+                (state, pd.IndexSlice["2020-10":"3000"]),
+                FRACTION_POSITIVE_NEW_TESTS_FIELD,
+            ] = np.nan
+
         covidtracking_df.loc[(state,), FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
             covidtracking_df.loc[(state,), POSITIVE_TESTS_TOTAL_3DCS_FIELD].astype(
                 float
             )
             / covidtracking_df.loc[(state,), NEW_TESTS_TOTAL_3DCS_FIELD]
         ).values
+
+        if state == "Hawaii":
+            covidtracking_df.loc[
+                (state, pd.IndexSlice["2020-10":"3000"]),
+                FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD,
+            ] = np.nan
 
         covidtracking_df.loc[(state,), PERCENT_POSITIVE_NEW_TESTS_3DCS_FIELD] = (
             100.0
@@ -712,6 +730,12 @@ def transform_covidtracking_data(covidtracking_df):
                 periods=1
             )
         ).values
+
+        if state == "Hawaii":
+            covidtracking_df.loc[
+                (state, pd.IndexSlice["2020-10":"3000"]),
+                PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD,
+            ] = np.nan
 
         # Calculate 2A: Achieve 14 or more consecutive days of decline in percent positive ... with up to 2-3
         # consecutive days of increasing or stable percent positive allowed as a grace period if data are inconsistent.
