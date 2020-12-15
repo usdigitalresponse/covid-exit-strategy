@@ -703,7 +703,7 @@ def transform_covidtracking_data(covidtracking_df):
             # Note: This is incredibly hacky but I couldn't figure out a way to make `pd.IndexSlice["2020-10": ]`
             #   include the last value but doing this does.
             covidtracking_df.loc[
-                (state, pd.IndexSlice["2020-10":"3000"]),
+                (state, pd.IndexSlice["2020-10":"2261"]),
                 FRACTION_POSITIVE_NEW_TESTS_FIELD,
             ] = np.nan
 
@@ -716,7 +716,7 @@ def transform_covidtracking_data(covidtracking_df):
 
         if state == "Hawaii":
             covidtracking_df.loc[
-                (state, pd.IndexSlice["2020-10":"3000"]),
+                (state, pd.IndexSlice["2020-10":"2261"]),
                 FRACTION_POSITIVE_NEW_TESTS_3DCS_FIELD,
             ] = np.nan
 
@@ -733,7 +733,7 @@ def transform_covidtracking_data(covidtracking_df):
 
         if state == "Hawaii":
             covidtracking_df.loc[
-                (state, pd.IndexSlice["2020-10":"3000"]),
+                (state, pd.IndexSlice["2020-10":"2261"]),
                 PERCENT_POSITIVE_NEW_TESTS_DIFF_3DCS_FIELD,
             ] = np.nan
 
